@@ -33,11 +33,11 @@ final class EditorialProjectsViewModelTests: TestCase {
   func testConfigureDiscoveryPageViewControllerWithParams() {
     self.configureDiscoveryPageViewControllerWithParams.assertDidNotEmitValue()
 
-    self.vm.inputs.configure(with: .goRewardless)
+    self.vm.inputs.configure(with: .lightsOn)
     self.vm.inputs.viewDidLoad()
 
     let expectedParams = DiscoveryParams.defaults
-      |> \.tagId .~ .goRewardless
+      |> \.tagId .~ .lightsOn
 
     self.configureDiscoveryPageViewControllerWithParams.assertValues([expectedParams])
   }
@@ -50,75 +50,64 @@ final class EditorialProjectsViewModelTests: TestCase {
     self.dismiss.assertValueCount(1)
   }
 
-  func testImageName_GoRewardless() {
+  func testImageName_LightsOn() {
     self.imageName.assertDidNotEmitValue()
 
-    self.vm.inputs.configure(with: .goRewardless)
+    self.vm.inputs.configure(with: .lightsOn)
     self.vm.inputs.viewDidLoad()
 
-    self.imageName.assertValues(["go-rewardless-modal"])
+    self.imageName.assertValues(["lights-on"])
   }
 
-  func testImageName_GoRewardless_iPad() {
-    self.imageName.assertDidNotEmitValue()
-
-    withEnvironment(device: MockDevice(userInterfaceIdiom: .pad)) {
-      self.vm.inputs.configure(with: .goRewardless)
-      self.vm.inputs.viewDidLoad()
-
-      self.imageName.assertValues(["go-rewardless-modal-large"])
-    }
-  }
-
-  func testTitleLabel_GoRewardless() {
+  func testTitleLabel_LightsOn() {
     self.titleLabelText.assertDidNotEmitValue()
 
-    self.vm.inputs.configure(with: .goRewardless)
+    self.vm.inputs.configure(with: .lightsOn)
     self.vm.inputs.viewDidLoad()
 
     self.titleLabelText.assertValues([
-      "This holiday season, support a project for no reward, just because it speaks to you."
+      "Show up for the spaces you love"
     ])
   }
 
   func testCloseButtonImageTintColor() {
     self.closeButtonImageTintColor.assertDidNotEmitValue()
 
-    self.vm.inputs.configure(with: .goRewardless)
+    self.vm.inputs.configure(with: .lightsOn)
     self.vm.inputs.viewDidLoad()
 
-    self.closeButtonImageTintColor.assertValues([.white])
+    self.closeButtonImageTintColor.assertValues([.ksr_white])
 
     self.vm.inputs.discoveryPageViewControllerContentOffsetChanged(to: .init(x: 0, y: -1))
 
-    self.closeButtonImageTintColor.assertValues([.white])
+    self.closeButtonImageTintColor.assertValues([.ksr_white])
 
     self.vm.inputs.discoveryPageViewControllerContentOffsetChanged(to: .init(x: 0, y: 0))
 
-    self.closeButtonImageTintColor.assertValues([.white, .ksr_soft_black])
+    self.closeButtonImageTintColor.assertValues([.ksr_white, .ksr_support_700])
 
     self.vm.inputs.discoveryPageViewControllerContentOffsetChanged(to: .init(x: 0, y: 1))
 
-    self.closeButtonImageTintColor.assertValues([.white, .ksr_soft_black])
+    self.closeButtonImageTintColor.assertValues([.ksr_white, .ksr_support_700])
 
     self.vm.inputs.discoveryPageViewControllerContentOffsetChanged(to: .init(x: 0, y: 100))
 
-    self.closeButtonImageTintColor.assertValues([.white, .ksr_soft_black])
+    self.closeButtonImageTintColor.assertValues([.ksr_white, .ksr_support_700])
 
     self.vm.inputs.discoveryPageViewControllerContentOffsetChanged(to: .init(x: 0, y: -5))
 
-    self.closeButtonImageTintColor.assertValues([.white, .ksr_soft_black, .white])
+    self.closeButtonImageTintColor.assertValues([.ksr_white, .ksr_support_700, .ksr_white])
 
     self.vm.inputs.discoveryPageViewControllerContentOffsetChanged(to: .init(x: 0, y: -100))
 
-    self.closeButtonImageTintColor.assertValues([.white, .ksr_soft_black, .white])
+    self.closeButtonImageTintColor.assertValues([.ksr_white, .ksr_support_700, .ksr_white])
   }
 
   func testPreferredStatusBarStyle() {
     self.setNeedsStatusBarAppearanceUpdate.assertDidNotEmitValue()
     XCTAssertEqual(.lightContent, self.vm.outputs.preferredStatusBarStyle())
 
-    self.vm.inputs.configure(with: .goRewardless)
+    self.vm.inputs.configure(with: .lightsOn)
     self.vm.inputs.viewDidLoad()
 
     self.setNeedsStatusBarAppearanceUpdate.assertDidNotEmitValue()
@@ -158,7 +147,7 @@ final class EditorialProjectsViewModelTests: TestCase {
   func testApplyViewTransformsWithYOffset() {
     self.applyViewTransformsWithYOffset.assertDidNotEmitValue()
 
-    self.vm.inputs.configure(with: .goRewardless)
+    self.vm.inputs.configure(with: .lightsOn)
     self.vm.inputs.viewDidLoad()
 
     self.vm.inputs.discoveryPageViewControllerContentOffsetChanged(to: .init(x: 0, y: 100))
@@ -179,14 +168,19 @@ final class EditorialProjectsViewModelTests: TestCase {
   }
 
   func testTrackCollectionViewed() {
-    let client = MockTrackingClient()
-    withEnvironment(koala: Koala(client: client)) {
-      XCTAssertEqual([], client.events)
+    let dataLakeClient = MockTrackingClient()
+    let segmentClient = MockTrackingClient()
+    withEnvironment(ksrAnalytics: KSRAnalytics(
+      dataLakeClient: dataLakeClient,
+      segmentClient: segmentClient
+    )) {
+      XCTAssertEqual([], dataLakeClient.events)
 
-      self.vm.inputs.configure(with: .goRewardless)
+      self.vm.inputs.configure(with: .lightsOn)
       self.vm.inputs.viewDidLoad()
 
-      XCTAssertEqual(["Collection Viewed"], client.events)
+      XCTAssertEqual(["Collection Viewed"], dataLakeClient.events)
+      XCTAssertEqual(["Collection Viewed"], segmentClient.events)
     }
   }
 }

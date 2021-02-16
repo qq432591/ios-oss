@@ -3,12 +3,27 @@ import KsApi
 import Prelude
 import ReactiveSwift
 
+public struct PledgeAmountSummaryViewData {
+  public let bonusAmount: Double?
+  public let bonusAmountHidden: Bool
+  public let isNoReward: Bool
+  public let locationName: String?
+  public let omitUSCurrencyCode: Bool
+  public let projectCountry: Project.Country
+  public let pledgedOn: TimeInterval
+  public let rewardMinimum: Double
+  public let shippingAmount: Double?
+  public let shippingAmountHidden: Bool
+}
+
 public protocol PledgeAmountSummaryViewModelInputs {
-  func configureWith(_ project: Project)
+  func configureWith(_ data: PledgeAmountSummaryViewData)
   func viewDidLoad()
 }
 
 public protocol PledgeAmountSummaryViewModelOutputs {
+  var bonusAmountText: Signal<NSAttributedString, Never> { get }
+  var bonusAmountStackViewIsHidden: Signal<Bool, Never> { get }
   var pledgeAmountText: Signal<NSAttributedString, Never> { get }
   var shippingAmountText: Signal<NSAttributedString, Never> { get }
   var shippingLocationStackViewIsHidden: Signal<Bool, Never> { get }
@@ -23,46 +38,46 @@ public protocol PledgeAmountSummaryViewModelType {
 public class PledgeAmountSummaryViewModel: PledgeAmountSummaryViewModelType,
   PledgeAmountSummaryViewModelInputs, PledgeAmountSummaryViewModelOutputs {
   public init() {
-    let project = Signal.combineLatest(
-      self.projectSignal,
+    let data = Signal.combineLatest(
+      self.configureWithDataSignal,
       self.viewDidLoadProperty.signal
     )
     .map(first)
 
-    let backing = project
-      .map { $0.personalization.backing }
-      .skipNil()
-
-    let projectAndBacking = project
-      .zip(with: backing)
-
-    self.pledgeAmountText = projectAndBacking
-      .map { project, backing in
-        attributedCurrency(with: project, amount: backing.pledgeAmount)
+    self.pledgeAmountText = data
+      .map {
+        (
+          $0.projectCountry,
+          $0.isNoReward ? ($0.bonusAmount ?? 0) : $0.rewardMinimum,
+          $0.omitUSCurrencyCode
+        )
       }
+      .map(attributedCurrency)
       .skipNil()
 
-    let shippingAmount = backing
-      .map { Double($0.shippingAmount ?? 0) }
-
-    self.shippingAmountText = project
-      .combineLatest(with: shippingAmount)
-      .map { project, shippingAmount in
-        shippingValue(with: project, shippingAmount: shippingAmount)
-      }
+    self.bonusAmountText = data
+      .map { data in (data.projectCountry, data.bonusAmount ?? 0, data.omitUSCurrencyCode) }
+      .map(plusSignAmount)
       .skipNil()
 
-    self.shippingLocationText = backing
-      .map { $0.locationName }
+    self.shippingAmountText = data.map { ($0.projectCountry, $0.shippingAmount ?? 0, $0.omitUSCurrencyCode) }
+      .map(plusSignAmount)
+      .skipNil()
+
+    self.shippingLocationText = data.map { $0.locationName }
       .skipNil()
       .map { Strings.Shipping_to_country(country: $0) }
 
-    self.shippingLocationStackViewIsHidden = backing.map { $0.locationId }.map(isNil)
+    self.bonusAmountStackViewIsHidden = data.map { $0.isNoReward || $0.bonusAmountHidden }
+    self.shippingLocationStackViewIsHidden = data.map {
+      $0.locationName == nil || $0.shippingAmountHidden
+    }
   }
 
-  private let (projectSignal, projectObserver) = Signal<Project, Never>.pipe()
-  public func configureWith(_ project: Project) {
-    self.projectObserver.send(value: project)
+  private let (configureWithDataSignal, configureWithDataObserver)
+    = Signal<PledgeAmountSummaryViewData, Never>.pipe()
+  public func configureWith(_ data: PledgeAmountSummaryViewData) {
+    self.configureWithDataObserver.send(value: data)
   }
 
   private let viewDidLoadProperty = MutableProperty(())
@@ -70,6 +85,8 @@ public class PledgeAmountSummaryViewModel: PledgeAmountSummaryViewModelType,
     self.viewDidLoadProperty.value = ()
   }
 
+  public let bonusAmountText: Signal<NSAttributedString, Never>
+  public let bonusAmountStackViewIsHidden: Signal<Bool, Never>
   public let pledgeAmountText: Signal<NSAttributedString, Never>
   public let shippingAmountText: Signal<NSAttributedString, Never>
   public let shippingLocationStackViewIsHidden: Signal<Bool, Never>
@@ -84,15 +101,18 @@ private func formattedPledgeDate(_ backing: Backing) -> String {
   return Strings.As_of_pledge_date(pledge_date: formattedDate)
 }
 
-private func attributedCurrency(with project: Project, amount: Double) -> NSAttributedString? {
+private func attributedCurrency(
+  with projectCountry: Project.Country,
+  amount: Double,
+  omitUSCurrencyCode: Bool
+) -> NSAttributedString? {
   let defaultAttributes = checkoutCurrencyDefaultAttributes()
-    .withAllValuesFrom([.foregroundColor: UIColor.ksr_green_500])
   let superscriptAttributes = checkoutCurrencySuperscriptAttributes()
   guard
     let attributedCurrency = Format.attributedCurrency(
       amount,
-      country: project.country,
-      omitCurrencyCode: project.stats.omitUSCurrencyCode,
+      country: projectCountry,
+      omitCurrencyCode: omitUSCurrencyCode,
       defaultAttributes: defaultAttributes,
       superscriptAttributes: superscriptAttributes
     ) else { return nil }
@@ -100,14 +120,18 @@ private func attributedCurrency(with project: Project, amount: Double) -> NSAttr
   return attributedCurrency
 }
 
-private func shippingValue(with project: Project, shippingAmount: Double) -> NSAttributedString? {
+private func plusSignAmount(
+  with projectCountry: Project.Country,
+  amount: Double,
+  omitUSCurrencyCode: Bool
+) -> NSAttributedString? {
   let defaultAttributes = checkoutCurrencyDefaultAttributes()
   let superscriptAttributes = checkoutCurrencySuperscriptAttributes()
   guard
     let attributedCurrency = Format.attributedCurrency(
-      shippingAmount,
-      country: project.country,
-      omitCurrencyCode: project.stats.omitUSCurrencyCode,
+      amount,
+      country: projectCountry,
+      omitCurrencyCode: omitUSCurrencyCode,
       defaultAttributes: defaultAttributes,
       superscriptAttributes: superscriptAttributes
     ) else { return nil }

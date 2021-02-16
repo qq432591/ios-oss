@@ -119,8 +119,8 @@ internal final class SignupViewController: UIViewController, MFMailComposeViewCo
     self.signupButton.rac.enabled = self.viewModel.outputs.isSignupButtonEnabled
 
     self.viewModel.outputs.logIntoEnvironment
-      .observeValues { [weak self] in
-        AppEnvironment.login($0)
+      .observeValues { [weak self] env in
+        AppEnvironment.login(env)
         self?.viewModel.inputs.environmentLoggedIn()
       }
 
@@ -242,9 +242,7 @@ internal final class SignupViewController: UIViewController, MFMailComposeViewCo
     helpSheet.addAction(UIAlertAction(
       title: Strings.login_tout_help_sheet_cancel(),
       style: .cancel,
-      handler: { [weak helpVM = self.helpViewModel] _ in
-        helpVM?.inputs.cancelHelpSheetButtonTapped()
-      }
+      handler: nil
     ))
 
     // iPad provision

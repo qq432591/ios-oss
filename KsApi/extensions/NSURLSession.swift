@@ -1,9 +1,7 @@
-import Argo
-import Curry
+
 import Foundation
 import Prelude
 import ReactiveSwift
-import Runes
 
 private func parseJSONData(_ data: Data) -> Any? {
   return (try? JSONSerialization.jsonObject(with: data, options: []))
@@ -88,15 +86,13 @@ internal extension URLSession {
         guard let response = response as? HTTPURLResponse else { fatalError() }
 
         guard self.isValidResponse(response: response) else {
-          if let json = parseJSONData(data) {
-            switch decode(json) as Decoded<ErrorEnvelope> {
-            case let .success(envelope):
-              // Got the error envelope
+          if let json = parseJSONData(data) as? [String: Any] {
+            do {
+              let envelope: ErrorEnvelope = try ErrorEnvelope.decodeJSONDictionary(json)
               print("🔴 [KsApi] Failure \(self.sanitized(request)) \n Error - \(envelope)")
-
               return SignalProducer(error: envelope)
-            case let .failure(error):
-              print("🔴 [KsApi] Failure \(self.sanitized(request)) \n Argo decoding error - \(error)")
+            } catch {
+              print("🔴 [KsApi] Failure \(self.sanitized(request)) \n Decoding error - \(error)")
               return SignalProducer(error: .couldNotDecodeJSON(error))
             }
 
@@ -126,7 +122,6 @@ internal extension URLSession {
       }
   }
 
-  // swiftlint:disable force_try
   fileprivate static let sanitationRules = [
     "oauth_token=[REDACTED]":
       try! NSRegularExpression(pattern: "oauth_token=([a-zA-Z0-9]*)", options: .caseInsensitive),
@@ -137,7 +132,6 @@ internal extension URLSession {
     "password=[REDACTED]":
       try! NSRegularExpression(pattern: "password=([a-zA-Z0-9]*)", options: .caseInsensitive)
   ]
-  // swiftlint:enable force_try
 
   // Strips sensitive materials from the request, e.g. oauth token, client id, fb token, password, etc...
   fileprivate func sanitized(_ request: URLRequest) -> String {

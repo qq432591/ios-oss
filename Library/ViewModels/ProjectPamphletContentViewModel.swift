@@ -2,8 +2,7 @@ import KsApi
 import Prelude
 import ReactiveSwift
 
-public typealias ProjectCreatorDetailsData = (ProjectCreatorDetailsEnvelope?, isLoading: Bool)
-public typealias ProjectPamphletContentData = (Project, ProjectCreatorDetailsData, RefTag?)
+public typealias ProjectPamphletContentData = (Project, RefTag?)
 
 public protocol ProjectPamphletContentViewModelInputs {
   func configureWith(value: (Project, RefTag?))
@@ -18,7 +17,7 @@ public protocol ProjectPamphletContentViewModelInputs {
 }
 
 public protocol ProjectPamphletContentViewModelOutputs {
-  var goToBacking: Signal<Project, Never> { get }
+  var goToBacking: Signal<ManagePledgeViewParamConfigData, Never> { get }
   var goToComments: Signal<Project, Never> { get }
   var goToDashboard: Signal<Param, Never> { get }
   var goToRewardPledge: Signal<(Project, Reward), Never> { get }
@@ -61,57 +60,8 @@ public final class ProjectPamphletContentViewModel: ProjectPamphletContentViewMo
     )
     .take(first: 1)
 
-    let projectCreatorDetails = project
-      .take(first: 1)
-      .map(\.slug)
-      .switchMap { slug in
-        AppEnvironment.current.apiService
-          .fetchProjectCreatorDetails(query: projectCreatorDetailsQuery(withSlug: slug))
-          .ksr_delay(AppEnvironment.current.apiDelayInterval, on: AppEnvironment.current.scheduler)
-          .map { result in (result, false) }
-          .prefix(value: (nil, true))
-          .demoteErrors(replaceErrorWith: (nil, false))
-          .materialize()
-      }
-
-    let projectCreatorDetailsLoadingValues = projectCreatorDetails.values()
-      .filter(second >>> isTrue)
-      .map { $0 as ProjectCreatorDetailsData }
-
-    let projectCreatorDetailsHasLoadedValues = projectCreatorDetails.values()
-      .filter(second >>> isFalse)
-
-    let projectCreatorDetailsExperimentValues = projectAndRefTag
-      .takePairWhen(projectCreatorDetailsHasLoadedValues)
-      .map { projectAndRefTag, creatorDetails in
-        (projectAndRefTag.0, projectAndRefTag.1, creatorDetails.0, creatorDetails.1)
-      }
-      .map { project, refTag, result, isLoading -> ProjectCreatorDetailsData in
-        let controlData: ProjectCreatorDetailsData = (nil, isLoading)
-
-        // Nil result indicates loading failed, errors demoted. No need to activate experiment.
-        guard result != nil else { return controlData }
-
-        guard
-          projectPageConversionCreatorDetailsExperiment(project: project, refTag: refTag) != .control
-        else { return controlData }
-
-        return (result, isLoading)
-      }
-
-    let projectCreatorDetailsValues = Signal.merge(
-      projectCreatorDetailsLoadingValues,
-      projectCreatorDetailsExperimentValues
-    )
-
-    let data = Signal.combineLatest(
-      projectAndRefTag,
-      projectCreatorDetailsValues
-    )
-    .map { projectAndRefTag, creatorDetails in (projectAndRefTag.0, creatorDetails, projectAndRefTag.1) }
-
     self.loadProjectPamphletContentDataIntoDataSource = Signal.combineLatest(
-      data,
+      projectAndRefTag,
       timeToLoadDataSource
     )
     .map(first)
@@ -193,7 +143,7 @@ public final class ProjectPamphletContentViewModel: ProjectPamphletContentViewMo
     self.viewWillAppearAnimatedProperty.value = animated
   }
 
-  public let goToBacking: Signal<Project, Never>
+  public let goToBacking: Signal<ManagePledgeViewParamConfigData, Never>
   public let goToComments: Signal<Project, Never>
   public let goToDashboard: Signal<Param, Never>
   public let goToRewardPledge: Signal<(Project, Reward), Never>
@@ -228,38 +178,10 @@ private func goToRewardPledgeData(forProject project: Project, rewardOrBacking: 
 }
 
 private func goToBackingData(forProject project: Project, rewardOrBacking: Either<Reward, Backing>)
-  -> Project? {
-  guard project.state != .live, rewardOrBacking.right != nil else {
+  -> ManagePledgeViewParamConfigData? {
+  guard project.state != .live, let backing = rewardOrBacking.right else {
     return nil
   }
 
-  return project
-}
-
-private func projectCreatorDetailsQuery(withSlug slug: String) -> NonEmptySet<Query> {
-  return Query.project(
-    slug: slug,
-    .id +| [
-      .creator(
-        .id +| [
-          .backingsCount,
-          .launchedProjects(
-            .totalCount +| []
-          )
-        ]
-      )
-    ]
-  ) +| []
-}
-
-private func projectPageConversionCreatorDetailsExperiment(
-  project: Project, refTag: RefTag?
-) -> OptimizelyExperiment.Variant? {
-  let optimizelyVariant = AppEnvironment.current.optimizelyClient?
-    .variant(
-      for: OptimizelyExperiment.Key.nativeProjectPageConversionCreatorDetails,
-      userAttributes: optimizelyUserAttributes(with: project, refTag: refTag)
-    )
-
-  return optimizelyVariant
+  return (projectParam: Param.slug(project.slug), backingParam: Param.id(backing.id))
 }

@@ -49,12 +49,12 @@ internal final class DashboardViewController: UITableViewController {
   override func bindStyles() {
     _ = self
       |> baseTableControllerStyle(estimatedRowHeight: 200.0)
-      |> UITableViewController.lens.view.backgroundColor .~ .white
+      |> UITableViewController.lens.view.backgroundColor .~ .ksr_white
 
     _ = self.loadingIndicatorView
       |> UIActivityIndicatorView.lens.hidesWhenStopped .~ true
       |> UIActivityIndicatorView.lens.style .~ .white
-      |> UIActivityIndicatorView.lens.color .~ .ksr_soft_black
+      |> UIActivityIndicatorView.lens.color .~ .ksr_support_700
   }
 
   override func viewWillDisappear(_ animated: Bool) {
@@ -229,6 +229,9 @@ internal final class DashboardViewController: UITableViewController {
 
   private func goToProject(_ project: Project, refTag: RefTag) {
     let vc = ProjectNavigatorViewController.configuredWith(project: project, refTag: refTag)
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      vc.modalPresentationStyle = .fullScreen
+    }
     self.present(vc, animated: true, completion: nil)
   }
 
@@ -240,18 +243,6 @@ internal final class DashboardViewController: UITableViewController {
   }
 
   private func showShareSheet(_ controller: UIActivityViewController) {
-    controller.completionWithItemsHandler = { [weak self] activityType, completed, returnedItems, error in
-
-      self?.shareViewModel.inputs.shareActivityCompletion(
-        with: .init(
-          activityType: activityType,
-          completed: completed,
-          returnedItems: returnedItems,
-          activityError: error
-        )
-      )
-    }
-
     if UIDevice.current.userInterfaceIdiom == .pad {
       controller.modalPresentationStyle = .popover
       controller.popoverPresentationController?.barButtonItem = self.navigationItem.rightBarButtonItem

@@ -1,5 +1,6 @@
 @testable import KsApi
 @testable import Library
+import Prelude
 import ReactiveExtensions_TestHelpers
 import ReactiveSwift
 import XCTest
@@ -66,11 +67,16 @@ internal final class SignupViewModelTests: TestCase {
     self.vm.inputs.signupButtonPressed()
     self.logIntoEnvironment.assertDidNotEmitValue("Does not immediately emit after signup button is pressed.")
 
-    XCTAssertEqual(["Signup Submit Button Clicked"], self.trackingClient.events)
+    XCTAssertEqual(["Signup Submit Button Clicked"], self.dataLakeTrackingClient.events)
+    XCTAssertEqual(["Signup Submit Button Clicked"], self.segmentTrackingClient.events)
 
     self.scheduler.advance()
 
-    self.logIntoEnvironment.assertValueCount(1, "Login after scheduler advances.")
+    self.logIntoEnvironment
+      .assertValueCount(
+        1,
+        "Log into environment without showing email verification because feature flag is false (not set)."
+      )
     self.postNotification.assertDidNotEmitValue("Does not emit until environment logged in.")
 
     self.vm.inputs.environmentLoggedIn()
@@ -143,32 +149,5 @@ internal final class SignupViewModelTests: TestCase {
       scheduler.advance()
       self.showError.assertValues([error, error], "Signup error.")
     }
-  }
-
-  func testWeeklyNewsletterChanged() {
-    self.vm.inputs.viewDidLoad()
-
-    self.vm.inputs.weeklyNewsletterChanged(true)
-    XCTAssertEqual(
-      ["Subscribed To Newsletter", "Signup Newsletter Toggle"],
-      self.trackingClient.events
-    )
-    XCTAssertEqual(
-      [true],
-      self.trackingClient.properties.compactMap { $0["send_newsletters"] as? Bool }
-    )
-
-    self.vm.inputs.weeklyNewsletterChanged(false)
-    XCTAssertEqual(
-      [
-        "Subscribed To Newsletter", "Signup Newsletter Toggle",
-        "Unsubscribed From Newsletter", "Signup Newsletter Toggle"
-      ],
-      self.trackingClient.events
-    )
-    XCTAssertEqual(
-      [true, false],
-      self.trackingClient.properties.compactMap { $0["send_newsletters"] as? Bool }
-    )
   }
 }

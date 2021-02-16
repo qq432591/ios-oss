@@ -4,8 +4,9 @@ import ReactiveExtensions
 import ReactiveSwift
 
 public typealias ThanksPageData = (
-  project: Project, reward: Reward,
-  checkoutData: Koala.CheckoutPropertiesData?
+  project: Project,
+  reward: Reward,
+  checkoutData: KSRAnalytics.CheckoutPropertiesData?
 )
 
 public protocol ThanksViewModelInputs {
@@ -60,7 +61,7 @@ public protocol ThanksViewModelOutputs {
   var showRatingAlert: Signal<(), Never> { get }
 
   /// Emits array of projects and a category when should show recommendations
-  var showRecommendations: Signal<([Project], KsApi.Category), Never> { get }
+  var showRecommendations: Signal<([Project], KsApi.Category, OptimizelyExperiment.Variant), Never> { get }
 
   /// Emits a User that can be used to replace the current user in the environment
   var updateUserInEnvironment: Signal<User, Never> { get }
@@ -136,7 +137,11 @@ public final class ThanksViewModel: ThanksViewModelType, ThanksViewModelInputs, 
       .flatMap { relatedProjects(toProject: $0.0, inCategory: $0.1) }
       .filter { projects in !projects.isEmpty }
 
-    self.showRecommendations = Signal.zip(projects, rootCategory)
+    self.showRecommendations = Signal.zip(projects, rootCategory).map { projects, category in
+      let variant = OptimizelyExperiment.nativeProjectCardsExperimentVariant()
+
+      return (projects, category, variant)
+    }
 
     self.goToProject = self.showRecommendations
       .map(first)
@@ -161,41 +166,27 @@ public final class ThanksViewModel: ThanksViewModelType, ThanksViewModelInputs, 
     self.showGamesNewsletterAlert
       .observeValues { AppEnvironment.current.userDefaults.hasSeenGamesNewsletterPrompt = true }
 
-    project
-      .takeWhen(self.goToDiscovery)
-      .observeValues { project in
-        AppEnvironment.current.koala.trackCheckoutFinishJumpToDiscovery(project: project)
-      }
+    self.projectTappedProperty.signal.skipNil().map { project in
+      (project, recommendedParams)
+    }.observeValues { project, params in
+      let optyProperties = optimizelyProperties() ?? [:]
 
-    project
-      .takeWhen(self.gamesNewsletterSignupButtonTappedProperty.signal)
-      .observeValues { project in
-        AppEnvironment.current.koala.trackChangeNewsletter(
-          newsletterType: .games,
-          sendNewsletter: true,
-          project: project,
-          context: .thanks
-        )
-      }
+      AppEnvironment.current.ksrAnalytics.trackProjectCardClicked(
+        project: project,
+        params: params,
+        location: .thanks,
+        optimizelyProperties: optyProperties
+      )
 
-    project
-      .takeWhen(self.goToProject)
-      .observeValues { project in
-        AppEnvironment.current.koala.trackCheckoutFinishJumpToProject(project: project)
-      }
-
-    project
-      .takeWhen(self.showRatingAlert)
-      .observeValues { project in
-        AppEnvironment.current.koala.trackTriggeredAppStoreRatingDialog(project: project)
-      }
+      AppEnvironment.current.optimizelyClient?.track(eventName: "Project Card Clicked")
+    }
 
     Signal.combineLatest(
       self.configureWithDataProperty.signal.skipNil(),
       self.viewDidLoadProperty.signal.ignoreValues()
     )
     .map(first)
-    .observeValues { AppEnvironment.current.koala.trackThanksPageViewed(
+    .observeValues { AppEnvironment.current.ksrAnalytics.trackThanksPageViewed(
       project: $0.project,
       reward: $0.reward,
       checkoutData: $0.checkoutData
@@ -260,7 +251,7 @@ public final class ThanksViewModel: ThanksViewModelType, ThanksViewModelInputs, 
   public let showRatingAlert: Signal<(), Never>
   public let showGamesNewsletterAlert: Signal<(), Never>
   public let showGamesNewsletterOptInAlert: Signal<String, Never>
-  public let showRecommendations: Signal<([Project], KsApi.Category), Never>
+  public let showRecommendations: Signal<([Project], KsApi.Category, OptimizelyExperiment.Variant), Never>
   public let updateUserInEnvironment: Signal<User, Never>
 }
 
@@ -283,10 +274,6 @@ private func relatedProjects(
 ) ->
   SignalProducer<[Project], Never> {
   let base = DiscoveryParams.lens.perPage .~ 3 <> DiscoveryParams.lens.backed .~ false
-
-  let recommendedParams = DiscoveryParams.defaults |> base
-    |> DiscoveryParams.lens.perPage .~ 6
-    |> DiscoveryParams.lens.recommended .~ true
 
   let similarToParams = DiscoveryParams.defaults |> base
     |> DiscoveryParams.lens.similarTo .~ project
@@ -341,3 +328,8 @@ private func shuffle(projects xs: [Project]) -> [Project] {
     return xs
   }
 }
+
+private let recommendedParams = DiscoveryParams.defaults
+  |> DiscoveryParams.lens.backed .~ false
+  |> DiscoveryParams.lens.perPage .~ 6
+  |> DiscoveryParams.lens.recommended .~ true

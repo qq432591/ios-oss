@@ -20,7 +20,7 @@ internal class TestCase: FBSnapshotTestCase {
   internal let optimizelyClient = MockOptimizelyClient()
   internal let reachability = MutableProperty(Reachability.wifi)
   internal let scheduler = TestScheduler(startDate: MockDate().date)
-  internal let trackingClient = MockTrackingClient()
+  internal let segmentTrackingClient = MockTrackingClient()
   internal let ubiquitousStore = MockKeyValueStore()
   internal let userDefaults = MockKeyValueStore()
 
@@ -39,7 +39,6 @@ internal class TestCase: FBSnapshotTestCase {
     UIViewController.doBadSwizzleStuff()
 
     var calendar = Calendar(identifier: .gregorian)
-    // swiftlint:disable:next force_unwrapping
     calendar.timeZone = TimeZone(identifier: "GMT")!
 
     AppEnvironment.pushEnvironment(
@@ -59,10 +58,10 @@ internal class TestCase: FBSnapshotTestCase {
       debounceInterval: .seconds(0),
       device: MockDevice(),
       isVoiceOverRunning: { false },
-      koala: Koala(
+      ksrAnalytics: KSRAnalytics(
         dataLakeClient: self.dataLakeTrackingClient,
-        client: self.trackingClient,
-        loggedInUser: nil
+        loggedInUser: nil,
+        segmentClient: self.segmentTrackingClient
       ),
       language: .en,
       launchedCountries: .init(),
@@ -80,6 +79,16 @@ internal class TestCase: FBSnapshotTestCase {
   override func tearDown() {
     super.tearDown()
     AppEnvironment.popEnvironment()
+  }
+
+  /// Fulfills an expectation on the next run loop to allow a layout pass when required in some tests.
+  internal func allowLayoutPass() {
+    let exp = self.expectation(description: "layoutPass")
+    DispatchQueue.main.async {
+      exp.fulfill()
+    }
+
+    waitForExpectations(timeout: 0.01)
   }
 }
 

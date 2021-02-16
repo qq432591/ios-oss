@@ -1,12 +1,16 @@
 import Foundation
 import KsApi
 
-public func featureGoRewardlessIsEnabled() -> Bool {
-  return Feature.goRewardless.isEnabled()
-}
-
 public func featureQualtricsIsEnabled() -> Bool {
   return Feature.qualtrics.isEnabled()
+}
+
+public func featureEmailVerificationFlowIsEnabled() -> Bool {
+  return Feature.emailVerificationFlow.isEnabled()
+}
+
+public func featureEmailVerificationSkipIsEnabled() -> Bool {
+  return Feature.emailVerificationSkip.isEnabled()
 }
 
 extension Feature {

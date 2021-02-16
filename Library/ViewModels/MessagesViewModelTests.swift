@@ -11,8 +11,8 @@ internal final class MessagesViewModelTests: TestCase {
   fileprivate let backingAndProjectAndIsFromBacking = TestObserver<(Backing, Project, Bool), Never>()
   fileprivate let emptyStateIsVisible = TestObserver<Bool, Never>()
   fileprivate let emptyStateMessage = TestObserver<String, Never>()
-  fileprivate let goToBackingProject = TestObserver<Project, Never>()
-  fileprivate let goToBackingUser = TestObserver<User, Never>()
+  fileprivate let goToBackingProjectParam = TestObserver<Param, Never>()
+  fileprivate let goToBackingBackingParam = TestObserver<Param?, Never>()
   fileprivate let goToProject = TestObserver<Project, Never>()
   fileprivate let goToRefTag = TestObserver<RefTag, Never>()
   fileprivate let messages = TestObserver<[Message], Never>()
@@ -28,8 +28,8 @@ internal final class MessagesViewModelTests: TestCase {
     self.vm.outputs.emptyStateIsVisibleAndMessageToUser.map { $0.0 }
       .observe(self.emptyStateIsVisible.observer)
     self.vm.outputs.emptyStateIsVisibleAndMessageToUser.map { $0.1 }.observe(self.emptyStateMessage.observer)
-    self.vm.outputs.goToBacking.map(first).observe(self.goToBackingProject.observer)
-    self.vm.outputs.goToBacking.map(second).observe(self.goToBackingUser.observer)
+    self.vm.outputs.goToBacking.map(first).observe(self.goToBackingProjectParam.observer)
+    self.vm.outputs.goToBacking.map(second).observe(self.goToBackingBackingParam.observer)
     self.vm.outputs.goToProject.map { $0.0 }.observe(self.goToProject.observer)
     self.vm.outputs.goToProject.map { $0.1 }.observe(self.goToRefTag.observer)
     self.vm.outputs.messages.observe(self.messages.observer)
@@ -52,12 +52,6 @@ internal final class MessagesViewModelTests: TestCase {
     self.project.assertValues([messageThread.project])
     self.backingAndProjectAndIsFromBacking.assertValueCount(1)
     self.messages.assertValueCount(1)
-
-    XCTAssertEqual(["Message Thread View", "Viewed Message Thread"], self.trackingClient.events)
-    XCTAssertEqual(
-      [true, nil],
-      self.trackingClient.properties(forKey: Koala.DeprecatedKey, as: Bool.self)
-    )
   }
 
   func testOutputs_ConfiguredWithThread_AndBacking() {
@@ -71,8 +65,6 @@ internal final class MessagesViewModelTests: TestCase {
     self.project.assertValues([messageThread.project])
     self.backingAndProjectAndIsFromBacking.assertValueCount(1)
     self.messages.assertValueCount(1)
-
-    XCTAssertEqual(["Message Thread View", "Viewed Message Thread"], self.trackingClient.events)
   }
 
   func testOutputs_ConfiguredWithProject() {
@@ -94,8 +86,6 @@ internal final class MessagesViewModelTests: TestCase {
       self.project.assertValues([project])
       self.backingAndProjectAndIsFromBacking.assertValueCount(1)
       self.messages.assertValueCount(1)
-
-      XCTAssertEqual(["Message Thread View", "Viewed Message Thread"], self.trackingClient.events)
     }
   }
 
@@ -121,8 +111,6 @@ internal final class MessagesViewModelTests: TestCase {
       self.project.assertValues([project])
       self.backingAndProjectAndIsFromBacking.assertValueCount(0)
       self.messages.assertValueCount(0)
-
-      XCTAssertEqual(["Message Thread View", "Viewed Message Thread"], self.trackingClient.events)
     }
   }
 
@@ -144,8 +132,6 @@ internal final class MessagesViewModelTests: TestCase {
       self.project.assertValues([project])
       self.backingAndProjectAndIsFromBacking.assertValueCount(1)
       self.messages.assertValueCount(1)
-
-      XCTAssertEqual(["Message Thread View", "Viewed Message Thread"], self.trackingClient.events)
     }
   }
 
@@ -172,6 +158,7 @@ internal final class MessagesViewModelTests: TestCase {
     let currentUser = User.template
       |> \.id .~ 42
     let messageThread = .template
+      |> MessageThread.lens.backing .~ backing
       |> MessageThread.lens.project .~ project
       |> MessageThread.lens.participant .~ .template
 
@@ -184,13 +171,13 @@ internal final class MessagesViewModelTests: TestCase {
 
       self.scheduler.advance()
 
-      self.goToBackingProject.assertDidNotEmitValue()
-      self.goToBackingUser.assertDidNotEmitValue()
+      self.goToBackingProjectParam.assertDidNotEmitValue()
+      self.goToBackingBackingParam.assertDidNotEmitValue()
 
       self.vm.inputs.backingInfoPressed()
 
-      self.goToBackingProject.assertValues([project])
-      self.goToBackingUser.assertValues([currentUser])
+      self.goToBackingProjectParam.assertValues([.slug(project.slug)])
+      self.goToBackingBackingParam.assertValues([.id(backing.id)])
     }
   }
 
@@ -201,6 +188,7 @@ internal final class MessagesViewModelTests: TestCase {
     let currentUser = User.template
       |> \.id .~ 42
     let messageThread = .template
+      |> MessageThread.lens.backing .~ backing
       |> MessageThread.lens.project .~ project
       |> MessageThread.lens.participant .~ .template
 
@@ -213,13 +201,13 @@ internal final class MessagesViewModelTests: TestCase {
 
       self.scheduler.advance()
 
-      self.goToBackingProject.assertDidNotEmitValue()
-      self.goToBackingUser.assertDidNotEmitValue()
+      self.goToBackingProjectParam.assertDidNotEmitValue()
+      self.goToBackingBackingParam.assertDidNotEmitValue()
 
       self.vm.inputs.backingInfoPressed()
 
-      self.goToBackingProject.assertValues([project])
-      self.goToBackingUser.assertValues([messageThread.participant])
+      self.goToBackingProjectParam.assertValues([.slug(project.slug)])
+      self.goToBackingBackingParam.assertValues([.id(backing.id)])
     }
   }
 

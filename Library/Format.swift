@@ -2,7 +2,6 @@ import Foundation
 import KsApi
 import Prelude
 
-// swiftlint:disable:next force_unwrapping
 public let UTCTimeZone = TimeZone(secondsFromGMT: 0)!
 
 public enum Format {
@@ -148,14 +147,16 @@ public enum Format {
     omitCurrencyCode: Bool = true,
     defaultAttributes: String.Attributes = [:],
     superscriptAttributes: String.Attributes = [:],
+    maximumFractionDigits: Int = 2,
+    minimumFractionDigits: Int = 2,
     env: Environment = AppEnvironment.current
   ) -> NSAttributedString? {
     let symbol = currencySymbol(forCountry: country, omitCurrencyCode: omitCurrencyCode, env: env)
     let config = NumberFormatterConfig.defaultCurrencyConfig
       |> NumberFormatterConfig.lens.locale .~ env.locale
       |> NumberFormatterConfig.lens.currencySymbol .~ symbol
-      |> NumberFormatterConfig.lens.minimumFractionDigits .~ 2
-      |> NumberFormatterConfig.lens.maximumFractionDigits .~ 2
+      |> NumberFormatterConfig.lens.minimumFractionDigits .~ maximumFractionDigits
+      |> NumberFormatterConfig.lens.maximumFractionDigits .~ minimumFractionDigits
 
     guard let formatter = NumberFormatterConfig.cachedFormatter(forConfig: config)
       as? AttributedNumberFormatter else { return nil }
@@ -272,7 +273,6 @@ public enum Format {
 
    - returns: A pair of strings for the numeric time value and unit.
    */
-  // swiftlint:disable valid_docs
   public static func duration(
     secondsInUTC seconds: TimeInterval,
     abbreviate: Bool = false,
@@ -331,8 +331,6 @@ public enum Format {
     }
     return result
   }
-
-  // swiftlint:enable valid_docs
 
   /**
    Format a date into a relative string.
@@ -454,10 +452,10 @@ extension DateFormatterConfig: Hashable {
 func == (lhs: DateFormatterConfig, rhs: DateFormatterConfig) -> Bool {
   return
     lhs.template == rhs.template
-    && lhs.dateStyle == rhs.dateStyle
-    && lhs.locale == rhs.locale
-    && lhs.timeStyle == rhs.timeStyle
-    && lhs.timeZone == rhs.timeZone
+      && lhs.dateStyle == rhs.dateStyle
+      && lhs.locale == rhs.locale
+      && lhs.timeStyle == rhs.timeStyle
+      && lhs.timeZone == rhs.timeZone
 }
 
 private struct NumberFormatterConfig {
@@ -545,11 +543,11 @@ extension NumberFormatterConfig: Hashable {
 private func == (lhs: NumberFormatterConfig, rhs: NumberFormatterConfig) -> Bool {
   return
     lhs.numberStyle == rhs.numberStyle
-    && lhs.roundingMode == rhs.roundingMode
-    && lhs.maximumFractionDigits == rhs.maximumFractionDigits
-    && lhs.generatesDecimalNumbers == rhs.generatesDecimalNumbers
-    && lhs.locale == rhs.locale
-    && lhs.currencySymbol == rhs.currencySymbol
+      && lhs.roundingMode == rhs.roundingMode
+      && lhs.maximumFractionDigits == rhs.maximumFractionDigits
+      && lhs.generatesDecimalNumbers == rhs.generatesDecimalNumbers
+      && lhs.locale == rhs.locale
+      && lhs.currencySymbol == rhs.currencySymbol
 }
 
 extension NumberFormatterConfig {

@@ -16,8 +16,9 @@ extension TabBarControllerScrollable where Self: UIViewController {
   }
 }
 
-public final class RootTabBarViewController: UITabBarController {
+public final class RootTabBarViewController: UITabBarController, MessageBannerViewControllerPresenting {
   private var applicationWillEnterForegroundObserver: Any?
+  public var messageBannerViewController: MessageBannerViewController?
   private var sessionEndedObserver: Any?
   private var sessionStartedObserver: Any?
   private var userUpdatedObserver: Any?
@@ -81,6 +82,8 @@ public final class RootTabBarViewController: UITabBarController {
           self?.viewModel.inputs.userLocalePreferencesChanged()
         }
       )
+
+    self.messageBannerViewController = self.configureMessageBannerViewController(on: self)
 
     self.viewModel.inputs.viewDidLoad()
   }
@@ -235,7 +238,6 @@ public final class RootTabBarViewController: UITabBarController {
     dashboardVC.navigateToProjectActivities(projectId: projectId)
   }
 
-  // swiftlint:disable:next function_body_length
   fileprivate func setTabBarItemStyles(withData data: TabBarItemsData) {
     data.items.forEach { item in
       switch item {
@@ -353,9 +355,9 @@ private func scrollToTop(_ viewController: UIViewController) {
 
 private func tabbarAvatarImageFromData(_ data: Data) -> (defaultImage: UIImage?, selectedImage: UIImage?) {
   let avatar = UIImage(data: data, scale: UIScreen.main.scale)?
-    .af_imageRoundedIntoCircle()
-    .af_imageAspectScaled(toFit: tabBarAvatarSize)
-  avatar?.af_inflate()
+    .af.imageRoundedIntoCircle()
+    .af.imageAspectScaled(toFit: tabBarAvatarSize)
+  avatar?.af.inflate()
 
   let deselectedImage = strokedRoundImage(
     fromImage: avatar,

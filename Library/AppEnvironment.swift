@@ -1,10 +1,8 @@
-import Argo
 import FBSDKCoreKit
 import Foundation
 import KsApi
 import Prelude
 import ReactiveSwift
-import Runes
 
 /**
  A global stack that captures the current state of global objects that the app wants access to.
@@ -28,7 +26,7 @@ public struct AppEnvironment: AppEnvironmentType {
     self.replaceCurrentEnvironment(
       apiService: self.current.apiService.login(OauthToken(token: envelope.accessToken)),
       currentUser: envelope.user,
-      koala: self.current.koala |> Koala.lens.loggedInUser .~ envelope.user
+      ksrAnalytics: self.current.ksrAnalytics |> KSRAnalytics.lens.loggedInUser .~ envelope.user
     )
   }
 
@@ -41,7 +39,7 @@ public struct AppEnvironment: AppEnvironmentType {
   public static func updateCurrentUser(_ user: User) {
     self.replaceCurrentEnvironment(
       currentUser: user,
-      koala: self.current.koala |> Koala.lens.loggedInUser .~ user
+      ksrAnalytics: self.current.ksrAnalytics |> KSRAnalytics.lens.loggedInUser .~ user
     )
   }
 
@@ -71,7 +69,7 @@ public struct AppEnvironment: AppEnvironmentType {
     self.replaceCurrentEnvironment(
       config: debugConfigOrConfig,
       countryCode: debugConfigOrConfig.countryCode,
-      koala: AppEnvironment.current.koala |> Koala.lens.config .~ debugConfigOrConfig
+      ksrAnalytics: AppEnvironment.current.ksrAnalytics |> KSRAnalytics.lens.config .~ debugConfigOrConfig
     )
   }
 
@@ -88,7 +86,7 @@ public struct AppEnvironment: AppEnvironmentType {
       apiService: AppEnvironment.current.apiService.logout(),
       cache: type(of: AppEnvironment.current.cache).init(),
       currentUser: nil,
-      koala: self.current.koala |> Koala.lens.loggedInUser .~ nil
+      ksrAnalytics: self.current.ksrAnalytics |> KSRAnalytics.lens.loggedInUser .~ nil
     )
   }
 
@@ -143,7 +141,7 @@ public struct AppEnvironment: AppEnvironmentType {
     debugData: DebugData? = AppEnvironment.current.debugData,
     device: UIDeviceType = AppEnvironment.current.device,
     isVoiceOverRunning: @escaping (() -> Bool) = AppEnvironment.current.isVoiceOverRunning,
-    koala: Koala = AppEnvironment.current.koala,
+    ksrAnalytics: KSRAnalytics = AppEnvironment.current.ksrAnalytics,
     language: Language = AppEnvironment.current.language,
     launchedCountries: LaunchedCountries = AppEnvironment.current.launchedCountries,
     locale: Locale = AppEnvironment.current.locale,
@@ -174,7 +172,7 @@ public struct AppEnvironment: AppEnvironmentType {
         debugData: debugData,
         device: device,
         isVoiceOverRunning: isVoiceOverRunning,
-        koala: koala,
+        ksrAnalytics: ksrAnalytics,
         language: language,
         launchedCountries: launchedCountries,
         locale: locale,
@@ -209,7 +207,7 @@ public struct AppEnvironment: AppEnvironmentType {
     debugData: DebugData? = AppEnvironment.current.debugData,
     device: UIDeviceType = AppEnvironment.current.device,
     isVoiceOverRunning: @escaping (() -> Bool) = AppEnvironment.current.isVoiceOverRunning,
-    koala: Koala = AppEnvironment.current.koala,
+    ksrAnalytics: KSRAnalytics = AppEnvironment.current.ksrAnalytics,
     language: Language = AppEnvironment.current.language,
     launchedCountries: LaunchedCountries = AppEnvironment.current.launchedCountries,
     locale: Locale = AppEnvironment.current.locale,
@@ -240,7 +238,7 @@ public struct AppEnvironment: AppEnvironmentType {
         debugData: debugData,
         device: device,
         isVoiceOverRunning: isVoiceOverRunning,
-        koala: koala,
+        ksrAnalytics: ksrAnalytics,
         language: language,
         launchedCountries: launchedCountries,
         locale: locale,
@@ -264,7 +262,8 @@ public struct AppEnvironment: AppEnvironmentType {
 
     var service = self.current.apiService
     var currentUser: User?
-    let config: Config? = data["config"].flatMap(decode)
+    let configDict: [String: Any]? = data["config"] as? [String: Any]
+    let config: Config? = configDict.flatMap(Config.decodeJSONDictionary)
 
     if let oauthToken = data["apiService.oauthToken.token"] as? String {
       // If there is an oauth token stored in the defaults, then we can authenticate our api service
@@ -343,14 +342,14 @@ public struct AppEnvironment: AppEnvironmentType {
 
     // Try restore the current user
     if service.oauthToken != nil {
-      currentUser = data["currentUser"].flatMap(decode)
+      currentUser = data["currentUser"].flatMap(tryDecode)
     }
 
     return Environment(
       apiService: service,
       config: config,
       currentUser: currentUser,
-      koala: self.current.koala |> Koala.lens.loggedInUser .~ currentUser
+      ksrAnalytics: self.current.ksrAnalytics |> KSRAnalytics.lens.loggedInUser .~ currentUser
     )
   }
 
@@ -362,19 +361,19 @@ public struct AppEnvironment: AppEnvironmentType {
   ) {
     var data: [String: Any] = [:]
 
+    // swiftformat:disable wrap
     data["apiService.oauthToken.token"] = env.apiService.oauthToken?.token
     data["apiService.serverConfig.apiBaseUrl"] = env.apiService.serverConfig.apiBaseUrl.absoluteString
-    // swiftlint:disable line_length
     data["apiService.serverConfig.apiClientAuth.clientId"] = env.apiService.serverConfig.apiClientAuth.clientId
     data["apiService.serverConfig.basicHTTPAuth.username"] = env.apiService.serverConfig.basicHTTPAuth?.username
     data["apiService.serverConfig.basicHTTPAuth.password"] = env.apiService.serverConfig.basicHTTPAuth?.password
-    // swiftlint:enable line_length
     data["apiService.serverConfig.webBaseUrl"] = env.apiService.serverConfig.webBaseUrl.absoluteString
-    data["apiService.serverConfig.environment"] = env.apiService.serverConfig.environment.rawValue
+    data["apiService.serverConfig.environment"] = env.apiService.serverConfig.environment.description
     data["apiService.language"] = env.apiService.language
     data["apiService.currency"] = env.apiService.currency
     data["config"] = env.config?.encode()
     data["currentUser"] = env.currentUser?.encode()
+    // swiftformat:enable wrap
 
     userDefaults.set(data, forKey: self.environmentStorageKey)
   }

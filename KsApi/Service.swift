@@ -76,11 +76,6 @@ public struct Service: ServiceType {
     return applyMutation(mutation: CreatePaymentSourceMutation(input: input))
   }
 
-  public func addVideo(file fileURL: URL, toDraft draft: UpdateDraft)
-    -> SignalProducer<UpdateDraft.Video, ErrorEnvelope> {
-    return request(Route.addVideo(fileUrl: fileURL, toDraft: draft))
-  }
-
   public func cancelBacking(input: CancelBackingInput)
     -> SignalProducer<GraphMutationEmptyResponseEnvelope, GraphError> {
     return applyMutation(mutation: CancelBackingMutation(input: input))
@@ -106,11 +101,6 @@ public struct Service: ServiceType {
     return applyMutation(mutation: UpdateUserAccountMutation(input: input))
   }
 
-  public func changePaymentMethod(project: Project)
-    -> SignalProducer<ChangePaymentMethodEnvelope, ErrorEnvelope> {
-    return request(.changePaymentMethod(project: project))
-  }
-
   public func clearUserUnseenActivity(input: EmptyInput)
     -> SignalProducer<ClearUserUnseenActivityEnvelope, GraphError> {
     return applyMutation(mutation: ClearUserUnseenActivityMutation(input: input))
@@ -129,11 +119,6 @@ public struct Service: ServiceType {
   public func delete(image: UpdateDraft.Image, fromDraft draft: UpdateDraft)
     -> SignalProducer<UpdateDraft.Image, ErrorEnvelope> {
     return request(.deleteImage(image, fromDraft: draft))
-  }
-
-  public func delete(video: UpdateDraft.Video, fromDraft draft: UpdateDraft)
-    -> SignalProducer<UpdateDraft.Video, ErrorEnvelope> {
-    return request(.deleteVideo(video, fromDraft: draft))
   }
 
   public func exportData() -> SignalProducer<VoidEnvelope, ErrorEnvelope> {
@@ -165,7 +150,7 @@ public struct Service: ServiceType {
 
   public func fetchActivities(paginationUrl: String)
     -> SignalProducer<ActivityEnvelope, ErrorEnvelope> {
-    return requestPagination(paginationUrl)
+    return requestPaginationDecodable(paginationUrl)
   }
 
   public func fetchBacking(forProject project: Project, forUser user: User)
@@ -174,7 +159,7 @@ public struct Service: ServiceType {
   }
 
   public func fetchComments(paginationUrl url: String) -> SignalProducer<CommentsEnvelope, ErrorEnvelope> {
-    return requestPagination(url)
+    return requestPaginationDecodable(url)
   }
 
   public func fetchComments(project: Project) -> SignalProducer<CommentsEnvelope, ErrorEnvelope> {
@@ -191,7 +176,7 @@ public struct Service: ServiceType {
 
   public func fetchDiscovery(paginationUrl: String)
     -> SignalProducer<DiscoveryEnvelope, ErrorEnvelope> {
-    return requestPagination(paginationUrl)
+    return requestPaginationDecodable(paginationUrl)
   }
 
   public func fetchDiscovery(params: DiscoveryParams)
@@ -205,7 +190,7 @@ public struct Service: ServiceType {
 
   public func fetchFriends(paginationUrl: String)
     -> SignalProducer<FindFriendsEnvelope, ErrorEnvelope> {
-    return requestPagination(paginationUrl)
+    return requestPaginationDecodable(paginationUrl)
   }
 
   public func fetchFriendStats() -> SignalProducer<FriendStatsEnvelope, ErrorEnvelope> {
@@ -228,8 +213,15 @@ public struct Service: ServiceType {
   }
 
   public func fetchGraphUserAccountFields(query: NonEmptySet<Query>)
-    -> SignalProducer<UserEnvelope<UserAccountFields>, GraphError> {
+    -> SignalProducer<UserEnvelope<GraphUser>, GraphError> {
     return fetch(query: query)
+  }
+
+  public func fetchGraphUserBackings(query: NonEmptySet<Query>)
+    -> SignalProducer<BackingsEnvelope, ErrorEnvelope> {
+    return fetch(query: query)
+      .mapError(ErrorEnvelope.envelope(from:))
+      .flatMap(BackingsEnvelope.envelopeProducer(from:))
   }
 
   public func fetchGraphUserEmailFields(query: NonEmptySet<Query>)
@@ -237,9 +229,11 @@ public struct Service: ServiceType {
     return fetch(query: query)
   }
 
-  public func fetchGraphUserBackings(query: NonEmptySet<Query>)
-    -> SignalProducer<UserEnvelope<GraphBackingEnvelope>, GraphError> {
+  public func fetchManagePledgeViewBacking(query: NonEmptySet<Query>)
+    -> SignalProducer<ProjectAndBackingEnvelope, ErrorEnvelope> {
     return fetch(query: query)
+      .mapError(ErrorEnvelope.envelope(from:))
+      .flatMap(ProjectAndBackingEnvelope.envelopeProducer(from:))
   }
 
   public func fetchMessageThread(messageThreadId: Int)
@@ -259,7 +253,7 @@ public struct Service: ServiceType {
 
   public func fetchMessageThreads(paginationUrl: String)
     -> SignalProducer<MessageThreadsEnvelope, ErrorEnvelope> {
-    return requestPagination(paginationUrl)
+    return requestPaginationDecodable(paginationUrl)
   }
 
   public func fetchProject(param: Param) -> SignalProducer<Project, ErrorEnvelope> {
@@ -281,12 +275,7 @@ public struct Service: ServiceType {
 
   public func fetchProjectActivities(paginationUrl: String)
     -> SignalProducer<ProjectActivityEnvelope, ErrorEnvelope> {
-    return requestPagination(paginationUrl)
-  }
-
-  public func fetchProjectCreatorDetails(query: NonEmptySet<Query>)
-    -> SignalProducer<ProjectCreatorDetailsEnvelope, GraphError> {
-    return fetch(query: query)
+    return requestPaginationDecodable(paginationUrl)
   }
 
   public func fetchProjectNotifications() -> SignalProducer<[ProjectNotification], ErrorEnvelope> {
@@ -298,12 +287,19 @@ public struct Service: ServiceType {
   }
 
   public func fetchProjects(paginationUrl url: String) -> SignalProducer<ProjectsEnvelope, ErrorEnvelope> {
-    return requestPagination(url)
+    return requestPaginationDecodable(url)
   }
 
   public func fetchProjectStats(projectId: Int) ->
     SignalProducer<ProjectStatsEnvelope, ErrorEnvelope> {
     return request(.projectStats(projectId: projectId))
+  }
+
+  public func fetchRewardAddOnsSelectionViewRewards(query: NonEmptySet<Query>)
+    -> SignalProducer<Project, ErrorEnvelope> {
+    return fetch(query: query)
+      .mapError(ErrorEnvelope.envelope(from:))
+      .flatMap(Project.projectProducer(from:))
   }
 
   public func fetchRewardShippingRules(projectId: Int, rewardId: Int)
@@ -315,13 +311,9 @@ public struct Service: ServiceType {
     return request(.surveyResponse(surveyResponseId: id))
   }
 
-  public func fetchUserProjectsBacked() -> SignalProducer<ProjectsEnvelope, ErrorEnvelope> {
-    return request(.userProjectsBacked)
-  }
-
   public func fetchUserProjectsBacked(paginationUrl url: String)
     -> SignalProducer<ProjectsEnvelope, ErrorEnvelope> {
-    return requestPagination(url)
+    return requestPaginationDecodable(url)
   }
 
   public func fetchUserSelf() -> SignalProducer<User, ErrorEnvelope> {
@@ -440,6 +432,11 @@ public struct Service: ServiceType {
     return applyMutation(mutation: UserSendEmailVerificationMutation(input: input))
   }
 
+  public func signInWithApple(input: SignInWithAppleInput)
+    -> SignalProducer<SignInWithAppleEnvelope, GraphError> {
+    return applyMutation(mutation: SignInWithAppleMutation(input: input))
+  }
+
   public func signup(
     name: String,
     email: String,
@@ -474,24 +471,6 @@ public struct Service: ServiceType {
     return request(.updateUpdateDraft(draft, title: title, body: body, isPublic: isPublic))
   }
 
-  public func updatePledge(
-    project: Project,
-    amount: Double,
-    reward: Reward?,
-    shippingLocation: Location?,
-    tappedReward: Bool
-  ) -> SignalProducer<UpdatePledgeEnvelope, ErrorEnvelope> {
-    return request(
-      .updatePledge(
-        project: project,
-        amount: amount,
-        reward: reward,
-        shippingLocation: shippingLocation,
-        tappedReward: tappedReward
-      )
-    )
-  }
-
   public func updateProjectNotification(_ notification: ProjectNotification)
     -> SignalProducer<ProjectNotification, ErrorEnvelope> {
     return request(.updateProjectNotification(notification: notification))
@@ -504,6 +483,11 @@ public struct Service: ServiceType {
   public func unwatchProject(input: WatchProjectInput) ->
     SignalProducer<GraphMutationWatchProjectResponseEnvelope, GraphError> {
     return applyMutation(mutation: UnwatchProjectMutation(input: input))
+  }
+
+  public func verifyEmail(withToken token: String)
+    -> SignalProducer<EmailVerificationResponseEnvelope, ErrorEnvelope> {
+    request(.verifyEmail(accessToken: token))
   }
 
   public func watchProject(input: WatchProjectInput) ->

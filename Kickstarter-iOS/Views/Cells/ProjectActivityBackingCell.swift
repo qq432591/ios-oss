@@ -5,7 +5,7 @@ import Prelude_UIKit
 import UIKit
 
 internal protocol ProjectActivityBackingCellDelegate: AnyObject {
-  func projectActivityBackingCellGoToBacking(project: Project, user: User)
+  func projectActivityBackingCellGoToBacking(project: Project, backing: Backing)
   func projectActivityBackingCellGoToSendMessage(project: Project, backing: Backing)
 }
 
@@ -36,10 +36,10 @@ internal final class ProjectActivityBackingCell: UITableViewCell, ValueCell {
     super.awakeFromNib()
 
     _ = self.backingButton
-      |> UIButton.lens.targets .~ [(self, #selector(backingButtonPressed), .touchUpInside)]
+      |> UIButton.lens.targets .~ [(self, #selector(self.backingButtonPressed), .touchUpInside)]
 
     _ = self.sendMessageButton
-      |> UIButton.lens.targets .~ [(self, #selector(sendMessageButtonPressed), .touchUpInside)]
+      |> UIButton.lens.targets .~ [(self, #selector(self.sendMessageButtonPressed), .touchUpInside)]
   }
 
   internal func configureWith(value activityAndProject: (Activity, Project)) {
@@ -58,18 +58,18 @@ internal final class ProjectActivityBackingCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.backerImageURL
       .observeForUI()
       .on(event: { [weak self] _ in
-        self?.backerImageView.af_cancelImageRequest()
+        self?.backerImageView.af.cancelImageRequest()
         self?.backerImageView.image = nil
       })
       .skipNil()
       .observeValues { [weak self] url in
-        self?.backerImageView.af_setImage(withURL: url)
+        self?.backerImageView.af.setImage(withURL: url)
       }
 
     self.viewModel.outputs.notifyDelegateGoToBacking
       .observeForUI()
-      .observeValues { [weak self] project, user in
-        self?.delegate?.projectActivityBackingCellGoToBacking(project: project, user: user)
+      .observeValues { [weak self] project, backing in
+        self?.delegate?.projectActivityBackingCellGoToBacking(project: project, backing: backing)
       }
 
     self.viewModel.outputs.notifyDelegateGoToSendMessage
@@ -109,7 +109,7 @@ internal final class ProjectActivityBackingCell: UITableViewCell, ValueCell {
 
         _ = rewardLabel
           |> UILabel.lens.numberOfLines .~ 0
-          |> UILabel.lens.textColor .~ .ksr_text_navy_600
+          |> UILabel.lens.textColor .~ .ksr_support_400
       }
 
     self.viewModel.outputs.title.observeForUI()
@@ -119,11 +119,11 @@ internal final class ProjectActivityBackingCell: UITableViewCell, ValueCell {
         titleLabel.attributedText = title.simpleHtmlAttributedString(
           base: [
             NSAttributedString.Key.font: UIFont.ksr_title3(size: 14),
-            NSAttributedString.Key.foregroundColor: UIColor.ksr_text_dark_grey_400
+            NSAttributedString.Key.foregroundColor: UIColor.ksr_support_400
           ],
           bold: [
             NSAttributedString.Key.font: UIFont.ksr_title3(size: 14),
-            NSAttributedString.Key.foregroundColor: UIColor.ksr_soft_black
+            NSAttributedString.Key.foregroundColor: UIColor.ksr_support_700
           ],
           italic: nil
         )
@@ -170,7 +170,7 @@ internal final class ProjectActivityBackingCell: UITableViewCell, ValueCell {
       |> projectActivityHeaderStackViewStyle
 
     _ = self.pledgeAmountLabel
-      |> UILabel.lens.textColor .~ .ksr_text_green_700
+      |> UILabel.lens.textColor .~ .ksr_create_700
       |> UILabel.lens.font .~ .ksr_callout(size: 24)
 
     _ = self.pledgeAmountLabelsStackView
@@ -182,10 +182,10 @@ internal final class ProjectActivityBackingCell: UITableViewCell, ValueCell {
 
     _ = self.previousPledgeAmountLabel
       |> UILabel.lens.font .~ .ksr_callout(size: 24)
-      |> UILabel.lens.textColor .~ .ksr_dark_grey_400
+      |> UILabel.lens.textColor .~ .ksr_support_400
 
     _ = self.previousPledgeStrikethroughView
-      |> UIView.lens.backgroundColor .~ .ksr_dark_grey_400
+      |> UIView.lens.backgroundColor .~ .ksr_support_400
 
     _ = self.sendMessageButton
       |> projectActivityFooterButton

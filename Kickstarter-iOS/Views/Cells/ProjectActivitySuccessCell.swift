@@ -25,12 +25,12 @@ internal final class ProjectActivitySuccessCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.backgroundImageURL
       .observeForUI()
       .on(event: { [weak backgroundImageView] _ in
-        backgroundImageView?.af_cancelImageRequest()
+        backgroundImageView?.af.cancelImageRequest()
         backgroundImageView?.image = nil
       })
       .skipNil()
       .observeValues { [weak backgroundImageView] url in
-        backgroundImageView?.af_setImage(withURL: url)
+        backgroundImageView?.af.setImage(withURL: url)
       }
 
     self.viewModel.outputs.title.observeForUI()
@@ -45,7 +45,7 @@ internal final class ProjectActivitySuccessCell: UITableViewCell, ValueCell {
 
         _ = titleLabel
           |> projectActivityStateChangeLabelStyle
-          |> UILabel.lens.textColor .~ .white
+          |> UILabel.lens.textColor .~ .ksr_white
       }
   }
 
@@ -69,7 +69,7 @@ internal final class ProjectActivitySuccessCell: UITableViewCell, ValueCell {
 
     _ = self.dropShadowView
       |> roundedStyle()
-      |> UIView.lens.backgroundColor .~ .white
+      |> UIView.lens.backgroundColor .~ .ksr_white
       |> dropShadowStyleMedium()
   }
 }

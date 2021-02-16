@@ -84,13 +84,14 @@ internal final class ProjectCreatorViewController: WebViewController {
 
   fileprivate func goToLoginTout(_ loginIntent: LoginIntent) {
     let vc = LoginToutViewController.configuredWith(loginIntent: loginIntent)
+    let isIpad = AppEnvironment.current.device.userInterfaceIdiom == .pad
     let nav = UINavigationController(rootViewController: vc)
-    nav.modalPresentationStyle = .formSheet
+      |> \.modalPresentationStyle .~ (isIpad ? .formSheet : .fullScreen)
 
     self.present(nav, animated: true, completion: nil)
   }
 
-  fileprivate func goToMessageDialog(subject: MessageSubject, context: Koala.MessageDialogContext) {
+  fileprivate func goToMessageDialog(subject: MessageSubject, context: KSRAnalytics.MessageDialogContext) {
     let vc = MessageDialogViewController.configuredWith(messageSubject: subject, context: context)
     vc.delegate = self
     let nav = UINavigationController(rootViewController: vc)

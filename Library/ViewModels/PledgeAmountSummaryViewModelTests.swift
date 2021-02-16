@@ -9,6 +9,8 @@ import XCTest
 final class PledgeAmountSummaryViewModelTests: TestCase {
   private let vm: PledgeAmountSummaryViewModelType = PledgeAmountSummaryViewModel()
 
+  private let bonusAmountText = TestObserver<String, Never>()
+  private let bonusAmountStackViewIsHidden = TestObserver<Bool, Never>()
   private let pledgeAmountText = TestObserver<String, Never>()
   private let shippingAmountText = TestObserver<String, Never>()
   private let shippingLocationStackViewIsHidden = TestObserver<Bool, Never>()
@@ -17,6 +19,10 @@ final class PledgeAmountSummaryViewModelTests: TestCase {
   override func setUp() {
     super.setUp()
 
+    self.vm.outputs.bonusAmountText.map { $0.string }
+      .observe(self.bonusAmountText.observer)
+    self.vm.outputs.bonusAmountStackViewIsHidden
+      .observe(self.bonusAmountStackViewIsHidden.observer)
     self.vm.outputs.pledgeAmountText.map { $0.string }
       .observe(self.pledgeAmountText.observer)
     self.vm.outputs.shippingAmountText.map { $0.string }
@@ -27,65 +33,187 @@ final class PledgeAmountSummaryViewModelTests: TestCase {
   }
 
   func testTextOutputsEmitTheCorrectValue() {
-    let backing = .template
-      |> Backing.lens.sequence .~ 999
-      |> Backing.lens.pledgedAt .~ 1_568_666_243.0
-      |> Backing.lens.amount .~ 30.0
-      |> Backing.lens.shippingAmount .~ 7
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 5,
+      bonusAmountHidden: false,
+      isNoReward: false,
+      locationName: "United States",
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 23,
+      shippingAmount: 7.0,
+      shippingAmountHidden: false
+    )
 
-    let project = Project.template
-      |> \.personalization.isBacking .~ true
-      |> \.personalization.backing .~ backing
-
-    self.vm.inputs.configureWith(project)
+    self.vm.inputs.configureWith(data)
     self.vm.inputs.viewDidLoad()
 
+    self.bonusAmountText.assertValue("+$5.00")
     self.pledgeAmountText.assertValue("$23.00")
     self.shippingAmountText.assertValue("+$7.00")
     self.shippingLocationText.assertValue("Shipping: United States")
   }
 
-  func testShippingLocationStackViewIsHidden_isFalse_WithShippableRewards() {
-    let reward = .template
-      |> Reward.lens.shipping.enabled .~ true
-    let backing = .template
-      |> Backing.lens.reward .~ reward
-    let project = Project.template
-      |> \.personalization.backing .~ backing
+  func testTextOutputsEmitTheCorrectValue_ZeroShippingAmount() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 0,
+      bonusAmountHidden: false,
+      isNoReward: false,
+      locationName: "United States",
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 30,
+      shippingAmount: 0,
+      shippingAmountHidden: false
+    )
 
-    self.vm.inputs.configureWith(project)
+    self.vm.inputs.configureWith(data)
     self.vm.inputs.viewDidLoad()
 
-    self.shippingLocationStackViewIsHidden.assertValue(false)
+    self.pledgeAmountText.assertValue("$30.00")
+    self.shippingAmountText.assertValue("+$0.00")
+    self.shippingLocationText.assertValue("Shipping: United States")
   }
 
-  func testShippingLocationStackViewIsHidden_isTrue_WhenLocationIdIsNil() {
-    let reward = Reward.template
-      |> Reward.lens.shipping.enabled .~ true
-    let backing = .template
-      |> Backing.lens.locationId .~ nil
-      |> Backing.lens.reward .~ reward
-    let project = Project.template
-      |> \.personalization.backing .~ backing
+  func testShippingLocationStackViewIsHidden_isTrue_WhenLocationNameIsNil() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 0,
+      bonusAmountHidden: false,
+      isNoReward: false,
+      locationName: nil,
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 30,
+      shippingAmount: 7.0,
+      shippingAmountHidden: false
+    )
 
-    self.vm.inputs.configureWith(project)
+    self.vm.inputs.configureWith(data)
     self.vm.inputs.viewDidLoad()
 
     self.shippingLocationStackViewIsHidden.assertValue(true)
   }
 
-  func testShippingLocationStackViewIsHidden_isFalse_WhenLocationIdIsNotNil() {
-    let reward = Reward.template
-      |> Reward.lens.shipping.enabled .~ true
-    let backing = .template
-      |> Backing.lens.locationId .~ 123
-      |> Backing.lens.reward .~ reward
-    let project = Project.template
-      |> \.personalization.backing .~ backing
+  func testShippingLocationStackViewIsHidden_isTrue_WhenShippingAmountIsHidden() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 0,
+      bonusAmountHidden: false,
+      isNoReward: false,
+      locationName: "United States",
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 30,
+      shippingAmount: 7.0,
+      shippingAmountHidden: true
+    )
 
-    self.vm.inputs.configureWith(project)
+    self.vm.inputs.configureWith(data)
+    self.vm.inputs.viewDidLoad()
+
+    self.shippingLocationStackViewIsHidden.assertValue(true)
+  }
+
+  func testShippingLocationStackViewIsHidden_isFalse_WhenLocationNameIsNotNil() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 0,
+      bonusAmountHidden: false,
+      isNoReward: false,
+      locationName: "United States",
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 30,
+      shippingAmount: 7.0,
+      shippingAmountHidden: false
+    )
+
+    self.vm.inputs.configureWith(data)
     self.vm.inputs.viewDidLoad()
 
     self.shippingLocationStackViewIsHidden.assertValue(false)
+  }
+
+  func testBonusAmountStackViewIsHidden_isTrue_WhenIsNoReward() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 1,
+      bonusAmountHidden: false,
+      isNoReward: true,
+      locationName: nil,
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 0,
+      shippingAmount: 0,
+      shippingAmountHidden: false
+    )
+
+    self.vm.inputs.configureWith(data)
+    self.vm.inputs.viewDidLoad()
+
+    self.shippingLocationStackViewIsHidden.assertValue(true)
+  }
+
+  func testBonusAmountStackViewIsHidden_isFalse_WhenIsNotNoReward() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 0,
+      bonusAmountHidden: false,
+      isNoReward: false,
+      locationName: nil,
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 30,
+      shippingAmount: 7.0,
+      shippingAmountHidden: false
+    )
+
+    self.vm.inputs.configureWith(data)
+    self.vm.inputs.viewDidLoad()
+
+    self.shippingLocationStackViewIsHidden.assertValue(true)
+  }
+
+  func testBonusAmountStackViewIsHidden_isTrue_WhenBonusAmountHidden() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 1,
+      bonusAmountHidden: true,
+      isNoReward: true,
+      locationName: nil,
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 0,
+      shippingAmount: 0,
+      shippingAmountHidden: false
+    )
+
+    self.vm.inputs.configureWith(data)
+    self.vm.inputs.viewDidLoad()
+
+    self.shippingLocationStackViewIsHidden.assertValue(true)
+  }
+
+  func testPledgeAmountText_NoReward() {
+    let data = PledgeAmountSummaryViewData(
+      bonusAmount: 2,
+      bonusAmountHidden: false,
+      isNoReward: true,
+      locationName: nil,
+      omitUSCurrencyCode: true,
+      projectCountry: Project.Country.us,
+      pledgedOn: 1_568_666_243.0,
+      rewardMinimum: 0,
+      shippingAmount: 0,
+      shippingAmountHidden: false
+    )
+
+    self.vm.inputs.configureWith(data)
+    self.vm.inputs.viewDidLoad()
+
+    self.pledgeAmountText.assertValues(["$2.00"], "Bonus amount is used as pledge total for No Reward type")
   }
 }

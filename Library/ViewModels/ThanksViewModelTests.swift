@@ -10,21 +10,22 @@ import XCTest
 final class ThanksViewModelTests: TestCase {
   let vm: ThanksViewModelType = ThanksViewModel()
 
-  let backedProjectText = TestObserver<String, Never>()
-  let dismissToRootViewControllerAndPostNotification = TestObserver<Notification.Name, Never>()
-  let goToDiscovery = TestObserver<KsApi.Category, Never>()
-  let goToProject = TestObserver<Project, Never>()
-  let goToProjects = TestObserver<[Project], Never>()
-  let goToRefTag = TestObserver<RefTag, Never>()
-  let showRatingAlert = TestObserver<(), Never>()
-  let showGamesNewsletterAlert = TestObserver<(), Never>()
-  let showGamesNewsletterOptInAlert = TestObserver<String, Never>()
-  let showRecommendations = TestObserver<[Project], Never>()
-  let postContextualNotification = TestObserver<(), Never>()
-  let postUserUpdatedNotification = TestObserver<Notification.Name, Never>()
-  let updateUserInEnvironment = TestObserver<User, Never>()
-  let facebookButtonIsHidden = TestObserver<Bool, Never>()
-  let twitterButtonIsHidden = TestObserver<Bool, Never>()
+  private let backedProjectText = TestObserver<String, Never>()
+  private let dismissToRootViewControllerAndPostNotification = TestObserver<Notification.Name, Never>()
+  private let goToDiscovery = TestObserver<KsApi.Category, Never>()
+  private let goToProject = TestObserver<Project, Never>()
+  private let goToProjects = TestObserver<[Project], Never>()
+  private let goToRefTag = TestObserver<RefTag, Never>()
+  private let showRatingAlert = TestObserver<(), Never>()
+  private let showGamesNewsletterAlert = TestObserver<(), Never>()
+  private let showGamesNewsletterOptInAlert = TestObserver<String, Never>()
+  private let showRecommendationsProjects = TestObserver<[Project], Never>()
+  private let showRecommendationsVariant = TestObserver<OptimizelyExperiment.Variant, Never>()
+  private let postContextualNotification = TestObserver<(), Never>()
+  private let postUserUpdatedNotification = TestObserver<Notification.Name, Never>()
+  private let updateUserInEnvironment = TestObserver<User, Never>()
+  private let facebookButtonIsHidden = TestObserver<Bool, Never>()
+  private let twitterButtonIsHidden = TestObserver<Bool, Never>()
 
   override func setUp() {
     super.setUp()
@@ -42,8 +43,9 @@ final class ThanksViewModelTests: TestCase {
     self.vm.outputs.showGamesNewsletterAlert.observe(self.showGamesNewsletterAlert.observer)
     self.vm.outputs.showGamesNewsletterOptInAlert.observe(self.showGamesNewsletterOptInAlert.observer)
     self.vm.outputs.showRatingAlert.observe(self.showRatingAlert.observer)
-    self.vm.outputs.showRecommendations.map { projects, _ in projects }
-      .observe(self.showRecommendations.observer)
+    self.vm.outputs.showRecommendations.map(first)
+      .observe(self.showRecommendationsProjects.observer)
+    self.vm.outputs.showRecommendations.map(third).observe(self.showRecommendationsVariant.observer)
     self.vm.outputs.updateUserInEnvironment.observe(self.updateUserInEnvironment.observer)
   }
 
@@ -72,14 +74,18 @@ final class ThanksViewModelTests: TestCase {
 
       scheduler.advance()
 
-      showRecommendations.assertValueCount(1)
+      showRecommendationsProjects.assertValueCount(1)
 
       vm.inputs.categoryCellTapped(.illustration)
 
       goToDiscovery.assertValues([.illustration])
       XCTAssertEqual(
-        ["Triggered App Store Rating Dialog", "Thanks Page Viewed", "Checkout Finished Discover More"],
-        self.trackingClient.events
+        ["Thanks Page Viewed"],
+        self.dataLakeTrackingClient.events
+      )
+      XCTAssertEqual(
+        ["Thanks Page Viewed"],
+        self.segmentTrackingClient.events
       )
     }
   }
@@ -106,7 +112,14 @@ final class ThanksViewModelTests: TestCase {
 
       showRatingAlert.assertValueCount(1, "Rating Alert emits when view did load")
       showGamesNewsletterAlert.assertValueCount(0, "Games alert does not emit")
-      XCTAssertEqual(["Triggered App Store Rating Dialog", "Thanks Page Viewed"], self.trackingClient.events)
+      XCTAssertEqual(
+        ["Thanks Page Viewed"],
+        self.dataLakeTrackingClient.events
+      )
+      XCTAssertEqual(
+        ["Thanks Page Viewed"],
+        self.segmentTrackingClient.events
+      )
     }
   }
 
@@ -171,8 +184,12 @@ final class ThanksViewModelTests: TestCase {
       updateUserInEnvironment.assertValueCount(1)
       showGamesNewsletterOptInAlert.assertValueCount(0, "Opt-in alert does not emit")
       XCTAssertEqual(
-        ["Thanks Page Viewed", "Subscribed To Newsletter", "Newsletter Subscribe"],
-        self.trackingClient.events
+        ["Thanks Page Viewed"],
+        self.dataLakeTrackingClient.events
+      )
+      XCTAssertEqual(
+        ["Thanks Page Viewed"],
+        self.segmentTrackingClient.events
       )
 
       vm.inputs.userUpdated()
@@ -215,8 +232,12 @@ final class ThanksViewModelTests: TestCase {
 
       showGamesNewsletterOptInAlert.assertValues(["Kickstarter Loves Games"], "Opt-in alert emits with title")
       XCTAssertEqual(
-        ["Thanks Page Viewed", "Subscribed To Newsletter", "Newsletter Subscribe"],
-        self.trackingClient.events
+        ["Thanks Page Viewed"],
+        self.dataLakeTrackingClient.events
+      )
+      XCTAssertEqual(
+        ["Thanks Page Viewed"],
+        self.segmentTrackingClient.events
       )
     }
   }
@@ -230,14 +251,18 @@ final class ThanksViewModelTests: TestCase {
 
     let project = Project.template
     let response = .template |> DiscoveryEnvelope.lens.projects .~ projects
+    let mockOptimizelyClient = MockOptimizelyClient()
 
-    withEnvironment(apiService: MockService(fetchDiscoveryResponse: response)) {
+    withEnvironment(
+      apiService: MockService(fetchDiscoveryResponse: response),
+      optimizelyClient: mockOptimizelyClient
+    ) {
       self.vm.inputs.configure(with: (project, Reward.template, nil))
       self.vm.inputs.viewDidLoad()
 
       scheduler.advance()
 
-      showRecommendations.assertValueCount(1)
+      showRecommendationsProjects.assertValueCount(1)
 
       vm.inputs.projectTapped(project)
 
@@ -246,12 +271,19 @@ final class ThanksViewModelTests: TestCase {
       goToRefTag.assertValues([.thanks])
       XCTAssertEqual(
         [
-          "Triggered App Store Rating Dialog",
           "Thanks Page Viewed",
-          "Checkout Finished Discover Open Project"
+          "Project Card Clicked"
         ],
-        self.trackingClient.events
+        self.dataLakeTrackingClient.events
       )
+      XCTAssertEqual(
+        [
+          "Thanks Page Viewed",
+          "Project Card Clicked"
+        ],
+        self.segmentTrackingClient.events
+      )
+      XCTAssertEqual("Project Card Clicked", mockOptimizelyClient.trackedEventKey)
     }
   }
 
@@ -274,7 +306,8 @@ final class ThanksViewModelTests: TestCase {
 
       scheduler.advance()
 
-      showRecommendations.assertValueCount(1, "Recommended projects emit, shuffled.")
+      self.showRecommendationsProjects.assertValueCount(1, "Recommended projects emit, shuffled.")
+      self.showRecommendationsVariant.assertValues([.control])
     }
   }
 
@@ -288,53 +321,125 @@ final class ThanksViewModelTests: TestCase {
 
       scheduler.advance()
 
-      showRecommendations.assertValueCount(0, "Recommended projects did not emit")
+      self.showRecommendationsProjects.assertValueCount(0, "Recommended projects did not emit")
+      self.showRecommendationsVariant.assertDidNotEmitValue()
+    }
+  }
+
+  func testRecommendationsProjects_ExperimentalVariant() {
+    let recommendedProject = Project.template
+      |> \.id .~ 3
+    let response = .template |> DiscoveryEnvelope.lens.projects .~ [recommendedProject]
+    let mockOptimizelyClient = MockOptimizelyClient()
+      |> \.experiments .~ [
+        OptimizelyExperiment.Key.nativeProjectCards.rawValue: OptimizelyExperiment.Variant.variant1.rawValue
+      ]
+
+    withEnvironment(
+      apiService: MockService(fetchDiscoveryResponse: response),
+      optimizelyClient: mockOptimizelyClient
+    ) {
+      self.vm.inputs.configure(with: (Project.template, Reward.template, nil))
+      self.vm.inputs.viewDidLoad()
+
+      scheduler.advance()
+
+      self.showRecommendationsProjects.assertValues([[recommendedProject]])
+      self.showRecommendationsVariant.assertValues([.variant1])
     }
   }
 
   func testThanksPageViewed_Properties() {
-    let checkoutData = Koala.CheckoutPropertiesData(
-      amount: "10.00",
+    let checkoutData = KSRAnalytics.CheckoutPropertiesData(
+      addOnsCountTotal: 2,
+      addOnsCountUnique: 1,
+      addOnsMinimumUsd: "8.00",
+      amount: "43.00",
+      bonusAmount: "10.00",
+      bonusAmountInUsd: "10.00",
       checkoutId: 1,
-      estimatedDelivery: nil,
+      estimatedDelivery: 12_345_678,
       paymentType: "CREDIT_CARD",
-      revenueInUsdCents: 500,
+      revenueInUsd: 20.00,
       rewardId: 2,
+      rewardMinimumUsd: "5.00",
       rewardTitle: "SUPER reward",
-      shippingEnabled: false,
-      shippingAmount: nil,
+      shippingEnabled: true,
+      shippingAmount: 10,
+      shippingAmountUsd: "10.00",
       userHasStoredApplePayCard: true
     )
 
     self.vm.inputs.configure(with: (Project.template, Reward.template, checkoutData))
     self.vm.inputs.viewDidLoad()
 
-    let props = self.trackingClient.properties.last
+    let dataLakeTrackingClientProps = self.dataLakeTrackingClient.properties.last
+    let segmentClientProps = self.segmentTrackingClient.properties.last
 
-    XCTAssertEqual(["Triggered App Store Rating Dialog", "Thanks Page Viewed"], self.trackingClient.events)
+    XCTAssertEqual(
+      ["Thanks Page Viewed"],
+      self.dataLakeTrackingClient.events
+    )
+    XCTAssertEqual(
+      ["Thanks Page Viewed"],
+      self.segmentTrackingClient.events
+    )
 
     // Checkout properties
-    XCTAssertEqual("10.00", props?["checkout_amount"] as? String)
-    XCTAssertEqual("CREDIT_CARD", props?["checkout_payment_type"] as? String)
-    XCTAssertEqual("SUPER reward", props?["checkout_reward_title"] as? String)
-    XCTAssertEqual(2, props?["checkout_reward_id"] as? Int)
-    XCTAssertEqual(500, props?["checkout_revenue_in_usd_cents"] as? Int)
-    XCTAssertEqual(false, props?["checkout_reward_shipping_enabled"] as? Bool)
-    XCTAssertEqual(true, props?["checkout_user_has_eligible_stored_apple_pay_card"] as? Bool)
-    XCTAssertNil(props?["checkout_shipping_amount"] as? Double)
-    XCTAssertNil(props?["checkout_reward_estimated_delivery_on"] as? TimeInterval)
+    XCTAssertEqual(2, dataLakeTrackingClientProps?["checkout_add_ons_count_total"] as? Int)
+    XCTAssertEqual(1, dataLakeTrackingClientProps?["checkout_add_ons_count_unique"] as? Int)
+    XCTAssertEqual("8.00", dataLakeTrackingClientProps?["checkout_add_ons_minimum_usd"] as? String)
+    XCTAssertEqual("43.00", dataLakeTrackingClientProps?["checkout_amount"] as? String)
+    XCTAssertEqual("10.00", dataLakeTrackingClientProps?["checkout_bonus_amount"] as? String)
+    XCTAssertEqual("10.00", dataLakeTrackingClientProps?["checkout_bonus_amount_usd"] as? String)
+    XCTAssertEqual("CREDIT_CARD", dataLakeTrackingClientProps?["checkout_payment_type"] as? String)
+    XCTAssertEqual("SUPER reward", dataLakeTrackingClientProps?["checkout_reward_title"] as? String)
+    XCTAssertEqual("5.00", dataLakeTrackingClientProps?["checkout_reward_minimum_usd"] as? String)
+    XCTAssertEqual(2, dataLakeTrackingClientProps?["checkout_reward_id"] as? Int)
+    XCTAssertEqual(20.00, dataLakeTrackingClientProps?["checkout_amount_total_usd"] as? Double)
+    XCTAssertEqual(true, dataLakeTrackingClientProps?["checkout_reward_is_limited_quantity"] as? Bool)
+    XCTAssertEqual(true, dataLakeTrackingClientProps?["checkout_reward_shipping_enabled"] as? Bool)
+    XCTAssertEqual(
+      true,
+      dataLakeTrackingClientProps?["checkout_user_has_eligible_stored_apple_pay_card"] as? Bool
+    )
+    XCTAssertEqual(10.00, dataLakeTrackingClientProps?["checkout_shipping_amount"] as? Double)
+    XCTAssertEqual("10.00", dataLakeTrackingClientProps?["checkout_shipping_amount_usd"] as? String)
+    XCTAssertEqual(
+      12_345_678,
+      dataLakeTrackingClientProps?["checkout_reward_estimated_delivery_on"] as? TimeInterval
+    )
+
+    XCTAssertEqual(2, segmentClientProps?["checkout_add_ons_count_total"] as? Int)
+    XCTAssertEqual(1, segmentClientProps?["checkout_add_ons_count_unique"] as? Int)
+    XCTAssertEqual("8.00", segmentClientProps?["checkout_add_ons_minimum_usd"] as? String)
+    XCTAssertEqual("43.00", segmentClientProps?["checkout_amount"] as? String)
+    XCTAssertEqual("10.00", segmentClientProps?["checkout_bonus_amount"] as? String)
+    XCTAssertEqual("10.00", segmentClientProps?["checkout_bonus_amount_usd"] as? String)
+    XCTAssertEqual("CREDIT_CARD", segmentClientProps?["checkout_payment_type"] as? String)
+    XCTAssertEqual("SUPER reward", segmentClientProps?["checkout_reward_title"] as? String)
+    XCTAssertEqual("5.00", segmentClientProps?["checkout_reward_minimum_usd"] as? String)
+    XCTAssertEqual(2, segmentClientProps?["checkout_reward_id"] as? Int)
+    XCTAssertEqual(20.00, segmentClientProps?["checkout_amount_total_usd"] as? Double)
+    XCTAssertEqual(true, segmentClientProps?["checkout_reward_is_limited_quantity"] as? Bool)
+    XCTAssertEqual(true, segmentClientProps?["checkout_reward_shipping_enabled"] as? Bool)
+    XCTAssertEqual(true, segmentClientProps?["checkout_user_has_eligible_stored_apple_pay_card"] as? Bool)
+    XCTAssertEqual(10.00, segmentClientProps?["checkout_shipping_amount"] as? Double)
+    XCTAssertEqual("10.00", segmentClientProps?["checkout_shipping_amount_usd"] as? String)
+    XCTAssertEqual(12_345_678, segmentClientProps?["checkout_reward_estimated_delivery_on"] as? TimeInterval)
 
     // Pledge properties
-    XCTAssertEqual(false, props?["pledge_backer_reward_has_items"] as? Bool)
-    XCTAssertEqual(1, props?["pledge_backer_reward_id"] as? Int)
-    XCTAssertEqual(true, props?["pledge_backer_reward_is_limited_quantity"] as? Bool)
-    XCTAssertEqual(false, props?["pledge_backer_reward_is_limited_time"] as? Bool)
-    XCTAssertEqual(10.00, props?["pledge_backer_reward_minimum"] as? Double)
-    XCTAssertEqual(false, props?["pledge_backer_reward_shipping_enabled"] as? Bool)
+    XCTAssertEqual(true, dataLakeTrackingClientProps?["pledge_backer_reward_has_items"] as? Bool)
+    XCTAssertEqual(1, dataLakeTrackingClientProps?["pledge_backer_reward_id"] as? Int)
+    XCTAssertEqual(10.00, dataLakeTrackingClientProps?["pledge_backer_reward_minimum"] as? Double)
 
-    XCTAssertNil(props?["pledge_backer_reward_shipping_preference"] as? String)
+    XCTAssertEqual(true, segmentClientProps?["pledge_backer_reward_has_items"] as? Bool)
+    XCTAssertEqual(1, segmentClientProps?["pledge_backer_reward_id"] as? Int)
+    XCTAssertEqual(10.00, segmentClientProps?["pledge_backer_reward_minimum"] as? Double)
 
     // Project properties
-    XCTAssertEqual(1, props?["project_pid"] as? Int)
+    XCTAssertEqual(1, dataLakeTrackingClientProps?["project_pid"] as? Int)
+
+    XCTAssertEqual(1, segmentClientProps?["project_pid"] as? Int)
   }
 }

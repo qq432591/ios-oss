@@ -1,5 +1,4 @@
 @testable import KsApi
-// swiftlint:disable force_unwrapping
 import XCTest
 
 final class ServiceTypeTests: XCTestCase {
@@ -95,6 +94,7 @@ final class ServiceTypeTests: XCTestCase {
     )
     XCTAssertEqual(
       [
+        "X-PX-AUTHORIZATION": "1",
         "Kickstarter-iOS-App": "1234567890",
         "Authorization": "token cafebeef",
         "Accept-Language": "ksr",
@@ -117,6 +117,7 @@ final class ServiceTypeTests: XCTestCase {
     )
     XCTAssertEqual(
       [
+        "X-PX-AUTHORIZATION": "1",
         "Kickstarter-iOS-App": "1234567890",
         "Authorization": "token cafebeef",
         "Accept-Language": "ksr",
@@ -140,6 +141,7 @@ final class ServiceTypeTests: XCTestCase {
     )
     XCTAssertEqual(
       [
+        "X-PX-AUTHORIZATION": "1",
         "Kickstarter-iOS-App": "1234567890",
         "Authorization": "token cafebeef",
         "Accept-Language": "ksr",
@@ -163,6 +165,7 @@ final class ServiceTypeTests: XCTestCase {
     )
     XCTAssertEqual(
       [
+        "X-PX-AUTHORIZATION": "1",
         "Kickstarter-iOS-App": "1234567890",
         "Authorization": "token cafebeef",
         "Accept-Language": "ksr",
@@ -195,6 +198,7 @@ final class ServiceTypeTests: XCTestCase {
     )
     XCTAssertEqual(
       [
+        "X-PX-AUTHORIZATION": "1",
         "Kickstarter-iOS-App": "1234567890",
         "Authorization": "token cafebeef",
         "Accept-Language": "ksr",
@@ -219,6 +223,7 @@ final class ServiceTypeTests: XCTestCase {
     )
     XCTAssertEqual(
       [
+        "X-PX-AUTHORIZATION": "1",
         "Kickstarter-iOS-App": "\(testToolBuildNumber())",
         "Authorization": "Basic dXNlcm5hbWU6cGFzc3dvcmQ=",
         "Accept-Language": "en",
@@ -258,6 +263,7 @@ final class ServiceTypeTests: XCTestCase {
     )
     XCTAssertEqual(
       [
+        "X-PX-AUTHORIZATION": "1",
         "Kickstarter-iOS-App": "\(testToolBuildNumber())",
         "Authorization": "Basic dXNlcm5hbWU6cGFzc3dvcmQ=",
         "Accept-Language": "en",
@@ -292,6 +298,7 @@ final class ServiceTypeTests: XCTestCase {
     XCTAssertEqual(request?.allHTTPHeaderFields?["Kickstarter-App-Id"], self.service.appId)
     XCTAssertEqual(request?.allHTTPHeaderFields?["Kickstarter-iOS-App"], self.service.buildVersion)
     XCTAssertEqual(request?.allHTTPHeaderFields?["X-KICKSTARTER-CLIENT"], "deadbeef")
+    XCTAssertEqual(request?.allHTTPHeaderFields?["X-PX-AUTHORIZATION"], "1")
     XCTAssertEqual(request?.allHTTPHeaderFields?["User-Agent"], userAgent())
     XCTAssertEqual(
       request?.allHTTPHeaderFields?["Kickstarter-iOS-App-UUID"],
@@ -315,20 +322,15 @@ final class ServiceTypeTests: XCTestCase {
   }
 }
 
-// swiftlint:disable line_length
+// swiftformat:disable wrap
 private func userAgent() -> String {
   return """
   com.apple.dt.xctest.tool/\(testToolBuildNumber()) (\(UIDevice.current.model); iOS \(UIDevice.current.systemVersion) Scale/\(UIScreen.main.scale))
   """
 }
 
-// swiftlint:enable line_length
+// swiftformat:enable wrap
 
-private func testToolBuildNumber() -> Int {
-  guard
-    let buildString = Bundle.main.infoDictionary?["CFBundleVersion"] as? String,
-    let buildNumber = Int(buildString)
-  else { return 0 }
-
-  return buildNumber
+private func testToolBuildNumber() -> String {
+  return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
 }

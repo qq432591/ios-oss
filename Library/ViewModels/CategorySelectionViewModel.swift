@@ -108,22 +108,18 @@ public final class CategorySelectionViewModel: CategorySelectionViewModelType,
 
     // Tracking
 
-    Signal.merge(
-      self.skipButtonTappedProperty.signal.mapConst("Skip"),
-      self.continueButtonTappedProperty.signal.mapConst("Continue")
-    )
-    .observeValues { buttonTitle in
-      let (properties, eventTags) = optimizelyTrackingAttributesAndEventTags()
+    self.skipButtonTappedProperty.signal.observeValues { _ in
+      let optimizelyProps = optimizelyProperties() ?? [:]
+      AppEnvironment.current.ksrAnalytics
+        .trackOnboardingSkipButtonClicked(optimizelyProperties: optimizelyProps)
+      trackOptimizelyClientButtonClicked(buttonTitle: "Skip")
+    }
 
-      let eventName = "\(buttonTitle) Button Clicked"
-
-      try? AppEnvironment.current.optimizelyClient?
-        .track(
-          eventKey: eventName,
-          userId: deviceIdentifier(uuid: UUID()),
-          attributes: properties,
-          eventTags: eventTags
-        )
+    self.continueButtonTappedProperty.signal.observeValues { _ in
+      let optimizelyProps = optimizelyProperties() ?? [:]
+      AppEnvironment.current.ksrAnalytics
+        .trackOnboardingContinueButtonClicked(optimizelyProperties: optimizelyProps)
+      trackOptimizelyClientButtonClicked(buttonTitle: "Continue")
     }
   }
 
@@ -259,4 +255,9 @@ private func cache(_ categories: [KsApi.Category]) {
   let data = try? JSONEncoder().encode(categories)
 
   AppEnvironment.current.userDefaults.onboardingCategories = data
+}
+
+private func trackOptimizelyClientButtonClicked(buttonTitle: String) {
+  let eventName = "\(buttonTitle) Button Clicked"
+  AppEnvironment.current.optimizelyClient?.track(eventName: eventName)
 }

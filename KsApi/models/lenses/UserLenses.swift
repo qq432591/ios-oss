@@ -6,9 +6,11 @@ extension User {
       view: { $0.avatar },
       set: { User(
         avatar: $0,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -18,7 +20,31 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
+      ) }
+    )
+
+    public static let erroredBackingsCount = Lens<User, Int?>(
+      view: { $0.erroredBackingsCount },
+      set: { User(
+        avatar: $1.avatar,
+        erroredBackingsCount: $0,
+        facebookConnected: $1.facebookConnected,
+        id: $1.id,
+        isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
+        isFriend: $1.isFriend,
+        location: $1.location,
+        name: $1.name,
+        needsFreshFacebookToken: $1.needsFreshFacebookToken,
+        newsletters: $1.newsletters,
+        notifications: $1.notifications,
+        optedOutOfRecommendations: $1.optedOutOfRecommendations,
+        showPublicProfile: $1.showPublicProfile,
+        social: $1.social,
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -26,10 +52,13 @@ extension User {
       view: { $0.facebookConnected },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $0,
         id: $1.id,
         isAdmin: $1.isAdmin,
-        isFriend: $1.isFriend, location: $1.location,
+        isEmailVerified: $1.isEmailVerified,
+        isFriend: $1.isFriend,
+        location: $1.location,
         name: $1.name,
         needsFreshFacebookToken: $1.needsFreshFacebookToken,
         newsletters: $1.newsletters,
@@ -37,7 +66,8 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -45,9 +75,11 @@ extension User {
       view: { $0.id },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $0,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -56,7 +88,8 @@ extension User {
         notifications: $1.notifications,
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
-        social: $1.social, stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        social: $1.social, stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -64,9 +97,11 @@ extension User {
       view: { $0.isAdmin },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $0,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -75,7 +110,30 @@ extension User {
         notifications: $1.notifications,
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
-        social: $1.social, stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        social: $1.social, stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
+      ) }
+    )
+
+    public static let isEmailVerified = Lens<User, Bool?>(
+      view: { $0.isEmailVerified },
+      set: { User(
+        avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
+        facebookConnected: $1.facebookConnected,
+        id: $1.id,
+        isAdmin: $1.isAdmin,
+        isEmailVerified: $0,
+        isFriend: $1.isFriend,
+        location: $1.location,
+        name: $1.name,
+        needsFreshFacebookToken: $1.needsFreshFacebookToken,
+        newsletters: $1.newsletters,
+        notifications: $1.notifications,
+        optedOutOfRecommendations: $1.optedOutOfRecommendations,
+        showPublicProfile: $1.showPublicProfile,
+        social: $1.social, stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -83,9 +141,11 @@ extension User {
       view: { $0.isFriend },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $0,
         location: $1.location,
         name: $1.name,
@@ -94,7 +154,8 @@ extension User {
         notifications: $1.notifications,
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
-        social: $1.social, stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        social: $1.social, stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -102,9 +163,11 @@ extension User {
       view: { $0.location },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $0,
         name: $1.name,
@@ -113,7 +176,8 @@ extension User {
         notifications: $1.notifications,
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
-        social: $1.social, stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        social: $1.social, stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -121,9 +185,11 @@ extension User {
       view: { $0.name },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $0,
@@ -133,7 +199,8 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -141,9 +208,11 @@ extension User {
       view: { $0.needsFreshFacebookToken },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -153,7 +222,8 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -161,9 +231,11 @@ extension User {
       view: { $0.newsletters },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -173,7 +245,8 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -181,9 +254,11 @@ extension User {
       view: { $0.notifications },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -193,7 +268,8 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -201,9 +277,11 @@ extension User {
       view: { $0.optedOutOfRecommendations },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -213,7 +291,8 @@ extension User {
         optedOutOfRecommendations: $0,
         showPublicProfile: $1.showPublicProfile,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -221,9 +300,11 @@ extension User {
       view: { $0.showPublicProfile },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -233,7 +314,8 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $0,
         social: $1.social,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -241,9 +323,11 @@ extension User {
       view: { $0.social },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -253,7 +337,8 @@ extension User {
         optedOutOfRecommendations: $1.optedOutOfRecommendations,
         showPublicProfile: $1.showPublicProfile,
         social: $0,
-        stats: $1.stats, unseenActivityCount: $1.unseenActivityCount
+        stats: $1.stats,
+        unseenActivityCount: $1.unseenActivityCount
       ) }
     )
 
@@ -261,9 +346,11 @@ extension User {
       view: { $0.stats },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,
@@ -281,9 +368,11 @@ extension User {
       view: { $0.unseenActivityCount },
       set: { User(
         avatar: $1.avatar,
+        erroredBackingsCount: $1.erroredBackingsCount,
         facebookConnected: $1.facebookConnected,
         id: $1.id,
         isAdmin: $1.isAdmin,
+        isEmailVerified: $1.isEmailVerified,
         isFriend: $1.isFriend,
         location: $1.location,
         name: $1.name,

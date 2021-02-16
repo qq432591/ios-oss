@@ -60,10 +60,15 @@ final class LoginViewModelTests: TestCase {
 
     self.vm.inputs.passwordTextFieldDoneEditing()
 
-    XCTAssertEqual(["Log In Submit Button Clicked"], self.trackingClient.events)
+    XCTAssertEqual(["Log In Submit Button Clicked"], self.dataLakeTrackingClient.events)
+    XCTAssertEqual(["Log In Submit Button Clicked"], self.segmentTrackingClient.events)
 
     self.dismissKeyboard.assertValueCount(1, "Keyboard is dismissed")
-    self.logIntoEnvironment.assertValueCount(1, "Log into environment.")
+    self.logIntoEnvironment
+      .assertValueCount(
+        1,
+        "Log into environment without showing email verification because feature flag is false (not set)."
+      )
 
     self.vm.inputs.environmentLoggedIn()
     XCTAssertEqual(
@@ -109,7 +114,6 @@ final class LoginViewModelTests: TestCase {
 
       self.logIntoEnvironment.assertValueCount(0, "Did not log into environment.")
 
-      // swiftlint:disable:next force_unwrapping
       self.showError.assertValues(["Unable to log in."], "Login errored")
       self.tfaChallenge.assertValueCount(0, "TFA challenge did not happen")
     }
@@ -131,7 +135,6 @@ final class LoginViewModelTests: TestCase {
 
       self.logIntoEnvironment.assertValueCount(0, "Did not log into environment.")
 
-      // swiftlint:disable:next force_unwrapping
       self.showError.assertValues([Strings.login_errors_unable_to_log_in()], "Login errored")
       self.tfaChallenge.assertValueCount(0, "TFA challenge did not happen")
     }

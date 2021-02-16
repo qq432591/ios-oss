@@ -43,47 +43,99 @@ internal final class DiscoveryViewModelTests: TestCase {
     self.configureDataSource.assertValueCount(1, "Data source configures after view loads.")
   }
 
-  func trackViewAppearedEvent() {
-    self.vm.inputs.viewDidLoad()
+  func testConfigureDataSourceOptimizelyConfiguration() {
+    let mockOptimizelyClient = MockOptimizelyClient()
 
-    XCTAssertEqual([], self.trackingClient.events)
+    withEnvironment(optimizelyClient: mockOptimizelyClient) {
+      self.vm.inputs.viewDidLoad()
+      self.vm.inputs.viewWillAppear(animated: false)
+      self.vm.inputs.optimizelyClientConfigured()
 
-    self.vm.inputs.viewWillAppear(animated: false)
+      XCTAssertTrue(mockOptimizelyClient.activatePathCalled)
 
-    XCTAssertEqual(["Viewed Discovery"], self.trackingClient.events)
-    XCTAssertEqual(["magic"], self.trackingClient.properties(forKey: "discover_sort"))
-    XCTAssertEqual([true], self.trackingClient.properties(forKey: "discover_staff_picks", as: Bool.self))
+      self.configureDataSource.assertValueCount(1)
+    }
+  }
 
-    self.vm.inputs.filter(withParams: self.categoryParams)
+  func testConfigureDataSource_OptimizelyConfiguration_Failed() {
+    withEnvironment(optimizelyClient: nil) {
+      self.vm.inputs.viewDidLoad()
+      self.vm.inputs.viewWillAppear(animated: false)
 
-    XCTAssertEqual(["Viewed Discovery", "Viewed Discovery"], self.trackingClient.events)
-    XCTAssertEqual(["magic", "magic"], self.trackingClient.properties(forKey: "discover_sort"))
-    XCTAssertEqual([1], self.trackingClient.properties(forKey: "category_id", as: Int.self))
+      self.vm.inputs.optimizelyClientConfigurationFailed()
 
-    self.vm.inputs.viewWillAppear(animated: true)
-
-    XCTAssertEqual(["Viewed Discovery", "Viewed Discovery"], self.trackingClient.events, "Does not emit")
-    XCTAssertEqual(["magic", "magic"], self.trackingClient.properties(forKey: "discover_sort"))
-    XCTAssertEqual([1], self.trackingClient.properties(forKey: "category_id", as: Int.self))
+      self.configureDataSource.assertValueCount(1)
+    }
   }
 
   func testLoadFilterIntoDataSource() {
-    self.loadFilterIntoDataSource.assertValueCount(0)
+    withEnvironment {
+      self.loadFilterIntoDataSource.assertValueCount(0)
 
-    self.vm.inputs.viewDidLoad()
-    self.vm.inputs.viewWillAppear(animated: false)
+      self.vm.inputs.viewDidLoad()
+      self.vm.inputs.viewWillAppear(animated: false)
+      self.scheduler.advance()
 
-    self.loadFilterIntoDataSource.assertValues(
-      [initialParams],
-      "Initial params load into data source immediately."
-    )
+      self.loadFilterIntoDataSource.assertValues(
+        [self.initialParams],
+        "Initial params load into data source immediately."
+      )
 
-    self.vm.inputs.filter(withParams: self.starredParams)
+      self.vm.inputs.filter(withParams: self.starredParams)
 
-    self.loadFilterIntoDataSource.assertValues(
-      [initialParams, starredParams],
-      "New params load into data source after selecting."
-    )
+      self.loadFilterIntoDataSource.assertValues(
+        [self.initialParams, self.starredParams],
+        "New params load into data source after selecting."
+      )
+    }
+  }
+
+  func testLoadFilterIntoDataSource_OptimizelyConfiguration() {
+    withEnvironment(optimizelyClient: nil) {
+      self.loadFilterIntoDataSource.assertValueCount(0)
+
+      self.vm.inputs.viewDidLoad()
+      self.vm.inputs.viewWillAppear(animated: false)
+
+      self.loadFilterIntoDataSource.assertDidNotEmitValue("Waits for Optimizely configuration")
+
+      self.vm.inputs.optimizelyClientConfigured()
+
+      self.scheduler.advance()
+
+      self.loadFilterIntoDataSource.assertValues([self.initialParams])
+
+      self.vm.inputs.filter(withParams: self.starredParams)
+
+      self.loadFilterIntoDataSource.assertValues(
+        [self.initialParams, self.starredParams],
+        "New params load into data source after selecting."
+      )
+    }
+  }
+
+  func testLoadFilterIntoDataSource_OptimizelyConfiguration_Failed() {
+    withEnvironment(optimizelyClient: nil) {
+      self.loadFilterIntoDataSource.assertValueCount(0)
+
+      self.vm.inputs.viewDidLoad()
+      self.vm.inputs.viewWillAppear(animated: false)
+
+      self.loadFilterIntoDataSource.assertDidNotEmitValue("Waits for Optimizely configuration")
+
+      self.vm.inputs.optimizelyClientConfigurationFailed()
+
+      self.scheduler.advance()
+
+      self.loadFilterIntoDataSource.assertValues([self.initialParams], "Proceeds after 3 seconds")
+
+      self.vm.inputs.filter(withParams: self.starredParams)
+
+      self.loadFilterIntoDataSource.assertValues(
+        [self.initialParams, self.starredParams],
+        "New params load into data source after selecting."
+      )
+    }
   }
 
   func testLoadRecommendedProjectsIntoDataSource_UserRecommendationsOptedOut() {
@@ -93,6 +145,8 @@ internal final class DiscoveryViewModelTests: TestCase {
     withEnvironment(config: Config.template, currentUser: user) {
       self.vm.inputs.viewDidLoad()
       self.vm.inputs.viewWillAppear(animated: false)
+
+      self.scheduler.advance()
 
       self.configureNavigationHeader.assertValues([initialParams])
     }
@@ -110,6 +164,8 @@ internal final class DiscoveryViewModelTests: TestCase {
     withEnvironment(config: Config.template, currentUser: user) {
       self.vm.inputs.viewDidLoad()
       self.vm.inputs.viewWillAppear(animated: false)
+
+      self.scheduler.advance()
 
       self.configureNavigationHeader.assertValues([recsInitialParams])
     }
@@ -131,11 +187,15 @@ internal final class DiscoveryViewModelTests: TestCase {
       self.vm.inputs.viewDidLoad()
       self.vm.inputs.viewWillAppear(animated: false)
 
+      self.scheduler.advance()
+
       self.configureNavigationHeader.assertValues([recsInitialParams])
 
       withEnvironment(currentUser: optedOutUser) {
         self.vm.inputs.didChangeRecommendationsSetting()
         self.vm.inputs.viewWillAppear(animated: false)
+
+        self.scheduler.advance()
 
         self.configureNavigationHeader.assertValues([recsInitialParams, initialParams])
       }
@@ -148,7 +208,57 @@ internal final class DiscoveryViewModelTests: TestCase {
     self.vm.inputs.viewDidLoad()
     self.vm.inputs.viewWillAppear(animated: false)
 
-    self.configureNavigationHeader.assertValues([initialParams])
+    self.scheduler.advance()
+
+    self.configureNavigationHeader.assertValues([self.initialParams])
+  }
+
+  func testConfigureNavigationHeader_OptimizelyConfiguration() {
+    withEnvironment(optimizelyClient: nil) {
+      self.configureNavigationHeader.assertValueCount(0)
+
+      self.vm.inputs.viewDidLoad()
+      self.vm.inputs.viewWillAppear(animated: false)
+
+      self.configureNavigationHeader.assertDidNotEmitValue("Waits for Optimizely configuration")
+
+      self.vm.inputs.optimizelyClientConfigured()
+
+      self.scheduler.advance()
+
+      self.configureNavigationHeader.assertValues([self.initialParams])
+
+      self.vm.inputs.filter(withParams: self.starredParams)
+
+      self.configureNavigationHeader.assertValues(
+        [self.initialParams, self.starredParams],
+        "New params load into data source after selecting."
+      )
+    }
+  }
+
+  func testConfigureNavigationHeader_OptimizelyConfiguration_Failed() {
+    withEnvironment(optimizelyClient: nil) {
+      self.configureNavigationHeader.assertValueCount(0)
+
+      self.vm.inputs.viewDidLoad()
+      self.vm.inputs.viewWillAppear(animated: false)
+
+      self.configureNavigationHeader.assertDidNotEmitValue("Waits for Optimizely configuration")
+
+      self.vm.inputs.optimizelyClientConfigurationFailed()
+
+      self.scheduler.advance()
+
+      self.configureNavigationHeader.assertValues([self.initialParams], "Proceeds after 3 seconds")
+
+      self.vm.inputs.filter(withParams: self.starredParams)
+
+      self.configureNavigationHeader.assertValues(
+        [self.initialParams, self.starredParams],
+        "New params load into data source after selecting."
+      )
+    }
   }
 
   func testOrdering() {
@@ -160,6 +270,8 @@ internal final class DiscoveryViewModelTests: TestCase {
 
     self.vm.inputs.viewDidLoad()
     self.vm.inputs.viewWillAppear(animated: false)
+
+    self.scheduler.advance()
 
     test.assertValues(
       ["configureDataSource", "loadFilterIntoDataSource"],
@@ -237,28 +349,40 @@ internal final class DiscoveryViewModelTests: TestCase {
     self.vm.inputs.viewDidLoad()
     self.vm.inputs.viewWillAppear(animated: true)
 
-    XCTAssertEqual([], self.trackingClient.events)
+    XCTAssertEqual([], self.dataLakeTrackingClient.events)
 
     self.vm.inputs.willTransition(toPage: 1)
 
-    XCTAssertEqual([], self.trackingClient.events, "No events tracked when starting a swipe transition.")
+    XCTAssertEqual(
+      [],
+      self.dataLakeTrackingClient.events,
+      "No events tracked when starting a swipe transition."
+    )
 
     self.vm.inputs.pageTransition(completed: false)
 
-    XCTAssertEqual([], self.trackingClient.events, "No events tracked when the transition did not complete.")
+    XCTAssertEqual(
+      [],
+      self.dataLakeTrackingClient.events,
+      "No events tracked when the transition did not complete."
+    )
 
     self.vm.inputs.willTransition(toPage: 1)
 
-    XCTAssertEqual([], self.trackingClient.events, "Still no events tracked when starting transition.")
+    XCTAssertEqual(
+      [],
+      self.dataLakeTrackingClient.events,
+      "Still no events tracked when starting transition."
+    )
 
     self.vm.inputs.pageTransition(completed: true)
 
     XCTAssertEqual(
-      ["Explore Sort Clicked"], self.trackingClient.events,
+      ["Explore Sort Clicked"], self.dataLakeTrackingClient.events,
       "Swipe event tracked once the transition completes."
     )
     XCTAssertEqual(
-      ["popularity"], self.trackingClient.properties(forKey: "discover_sort"),
+      ["popularity"], self.dataLakeTrackingClient.properties(forKey: "discover_sort"),
       "Correct sort is tracked."
     )
 
@@ -266,12 +390,12 @@ internal final class DiscoveryViewModelTests: TestCase {
 
     XCTAssertEqual(
       ["Explore Sort Clicked", "Explore Sort Clicked"],
-      self.trackingClient.events,
+      self.dataLakeTrackingClient.events,
       "Event is tracked when a sort is chosen from the pager."
     )
     XCTAssertEqual(
       ["popularity", "newest"],
-      self.trackingClient.properties(forKey: "discover_sort"),
+      self.dataLakeTrackingClient.properties(forKey: "discover_sort"),
       "Correct sort is tracked."
     )
 
@@ -279,12 +403,12 @@ internal final class DiscoveryViewModelTests: TestCase {
 
     XCTAssertEqual(
       ["Explore Sort Clicked", "Explore Sort Clicked"],
-      self.trackingClient.events,
+      self.dataLakeTrackingClient.events,
       "Selecting the same sort again does not track another event."
     )
     XCTAssertEqual(
       ["popularity", "newest"],
-      self.trackingClient.properties(forKey: "discover_sort")
+      self.dataLakeTrackingClient.properties(forKey: "discover_sort")
     )
   }
 

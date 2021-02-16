@@ -2,8 +2,25 @@ import KsApi
 import Prelude
 import ReactiveSwift
 
+public struct RewardCardPillData: Equatable {
+  public let backgroundColor: UIColor
+  public let text: String
+  public let textColor: UIColor
+}
+
+public enum RewardCardViewContext {
+  case pledge
+  case manage
+}
+
+public typealias RewardCardViewData = (
+  project: Project,
+  reward: Reward,
+  context: RewardCardViewContext
+)
+
 public protocol RewardCardViewModelInputs {
-  func configureWith(project: Project, rewardOrBacking: Either<Reward, Backing>)
+  func configure(with data: RewardCardViewData)
   func rewardCardTapped()
 }
 
@@ -17,11 +34,11 @@ public protocol RewardCardViewModelOutputs {
   var includedItemsStackViewHidden: Signal<Bool, Never> { get }
   var items: Signal<[String], Never> { get }
   var pillCollectionViewHidden: Signal<Bool, Never> { get }
-  var reloadPills: Signal<[String], Never> { get }
+  var reloadPills: Signal<[RewardCardPillData], Never> { get }
   var rewardMinimumLabelText: Signal<String, Never> { get }
   var rewardSelected: Signal<Int, Never> { get }
   var rewardTitleLabelHidden: Signal<Bool, Never> { get }
-  var rewardTitleLabelText: Signal<String, Never> { get }
+  var rewardTitleLabelAttributedText: Signal<NSAttributedString, Never> { get }
 }
 
 public protocol RewardCardViewModelType {
@@ -32,52 +49,31 @@ public protocol RewardCardViewModelType {
 public final class RewardCardViewModel: RewardCardViewModelType, RewardCardViewModelInputs,
   RewardCardViewModelOutputs {
   public init() {
-    let projectAndRewardOrBacking: Signal<(Project, Either<Reward, Backing>), Never> =
-      self.projectAndRewardOrBackingProperty.signal
+    let configData = self.configDataProperty.signal
       .skipNil()
-      .map { ($0.0, $0.1) }
 
-    let project: Signal<Project, Never> = projectAndRewardOrBacking.map(first)
+    let context = configData.map(third)
 
-    let reward: Signal<Reward, Never> = projectAndRewardOrBacking
-      .map { project, rewardOrBacking -> Reward in
-        rewardOrBacking.left
-          ?? rewardOrBacking.right?.reward
-          ?? backingReward(fromProject: project)
-          ?? Reward.noReward
-      }
+    let project: Signal<Project, Never> = configData.map(first)
+    let reward: Signal<Reward, Never> = configData.map(second)
 
     let projectAndReward = Signal.zip(project, reward)
 
     self.conversionLabelHidden = project.map(needsConversion(project:) >>> negate)
-    /* The conversion logic here is currently the same as what we already have, but note that
-     this will likely change to make rounding more consistent
-     */
-    self.conversionLabelText = projectAndRewardOrBacking
+
+    self.conversionLabelText = projectAndReward
       .filter(first >>> needsConversion(project:))
-      .map { project, rewardOrBacking in
-        let (country, rate) = zip(
-          project.stats.currentCountry,
-          project.stats.currentCurrencyRate
-        ) ?? (.us, project.stats.staticUsdRate)
-        switch rewardOrBacking {
-        case let .left(reward):
-          return Format.currency(
-            reward.convertedMinimum,
-            country: country,
-            omitCurrencyCode: project.stats.omitUSCurrencyCode
-          )
-        case let .right(backing):
-          return Format.currency(
-            Int(ceil(Float(backing.amount) * rate)),
-            country: country,
-            omitCurrencyCode: project.stats.omitUSCurrencyCode
-          )
-        }
+      .map { project, reward in
+        Format.currency(
+          reward.convertedMinimum,
+          country: project.stats.currentCountry ?? .us,
+          omitCurrencyCode: project.stats.omitUSCurrencyCode
+        )
       }
       .map(Strings.About_reward_amount(reward_amount:))
 
-    self.rewardMinimumLabelText = projectAndRewardOrBacking
+    self.rewardMinimumLabelText = projectAndReward
+      .map { project, reward in (project, Either<Reward, Backing>.left(reward)) }
       .map(formattedAmountForRewardOrBacking(project:rewardOrBacking:))
 
     self.descriptionLabelText = projectAndReward
@@ -86,14 +82,11 @@ public final class RewardCardViewModel: RewardCardViewModelType, RewardCardViewM
     self.rewardTitleLabelHidden = reward
       .map { $0.title == nil && !$0.isNoReward }
 
-    self.rewardTitleLabelText = projectAndReward
+    self.rewardTitleLabelAttributedText = projectAndReward
       .map(rewardTitle(project:reward:))
 
     let rewardItemsIsEmpty = reward
       .map { $0.rewardsItems.isEmpty }
-
-    let rewardAvailable = reward
-      .map { $0.remaining == 0 }.negate()
 
     self.includedItemsStackViewHidden = rewardItemsIsEmpty.skipRepeats()
 
@@ -113,15 +106,20 @@ public final class RewardCardViewModel: RewardCardViewModelType, RewardCardViewM
       .takeWhen(self.rewardCardTappedProperty.signal)
       .map { $0.id }
 
-    self.cardUserInteractionIsEnabled = rewardAvailable
+    self.cardUserInteractionIsEnabled = projectAndReward.map { project, reward in
+      rewardsCarouselCanNavigateToReward(reward, in: project)
+    }
 
-    self.estimatedDeliveryDateLabelHidden = reward.map { $0.estimatedDeliveryOn }.map(isNil)
+    self.estimatedDeliveryDateLabelHidden = context.combineLatest(with: reward)
+      .map { context, reward in
+        context == .manage || reward.estimatedDeliveryOn == nil
+      }
     self.estimatedDeliveryDateLabelText = reward.map(estimatedDeliveryText(with:)).skipNil()
   }
 
-  private let projectAndRewardOrBackingProperty = MutableProperty<(Project, Either<Reward, Backing>)?>(nil)
-  public func configureWith(project: Project, rewardOrBacking: Either<Reward, Backing>) {
-    self.projectAndRewardOrBackingProperty.value = (project, rewardOrBacking)
+  private let configDataProperty = MutableProperty<RewardCardViewData?>(nil)
+  public func configure(with data: RewardCardViewData) {
+    self.configDataProperty.value = data
   }
 
   private let rewardCardTappedProperty = MutableProperty(())
@@ -138,11 +136,11 @@ public final class RewardCardViewModel: RewardCardViewModelType, RewardCardViewM
   public let items: Signal<[String], Never>
   public let includedItemsStackViewHidden: Signal<Bool, Never>
   public let pillCollectionViewHidden: Signal<Bool, Never>
-  public let reloadPills: Signal<[String], Never>
+  public let reloadPills: Signal<[RewardCardPillData], Never>
   public let rewardMinimumLabelText: Signal<String, Never>
   public let rewardSelected: Signal<Int, Never>
   public let rewardTitleLabelHidden: Signal<Bool, Never>
-  public let rewardTitleLabelText: Signal<String, Never>
+  public let rewardTitleLabelAttributedText: Signal<NSAttributedString, Never>
 
   public var inputs: RewardCardViewModelInputs { return self }
   public var outputs: RewardCardViewModelOutputs { return self }
@@ -166,11 +164,6 @@ private func backingReward(fromProject project: Project) -> Reward? {
 }
 
 private func localizedDescription(project: Project, reward: Reward) -> String {
-  if featureGoRewardlessIsEnabled(),
-    reward.isNoReward, !userIsBacking(reward: reward, inProject: project) {
-    return Strings.This_holiday_season_support_a_project_for_no_reward()
-  }
-
   guard project.personalization.isBacking == true else {
     return reward.isNoReward ? Strings.Back_it_because_you_believe_in_it() : reward.description
   }
@@ -184,34 +177,72 @@ private func localizedDescription(project: Project, reward: Reward) -> String {
   return reward.description
 }
 
-private func rewardTitle(project: Project, reward: Reward) -> String {
-  if featureGoRewardlessIsEnabled(),
-    reward.isNoReward, !userIsBacking(reward: reward, inProject: project) {
-    return Strings.Back_it_because_you_believe_in_it()
-  }
-
-  guard project.personalization.isBacking == true else {
-    return reward.isNoReward ? Strings.Pledge_without_a_reward() : reward.title.coalesceWith("")
+private func rewardTitle(project: Project, reward: Reward) -> NSAttributedString {
+  guard project.personalization.isBacking == true || currentUserIsCreator(of: project) else {
+    return NSAttributedString(
+      string: reward.isNoReward ? Strings.Pledge_without_a_reward() : reward.title.coalesceWith("")
+    )
   }
 
   if reward.isNoReward {
-    return userIsBacking(reward: reward, inProject: project)
+    let string = userIsBacking(reward: reward, inProject: project)
       ? Strings.You_pledged_without_a_reward() : Strings.Pledge_without_a_reward()
+
+    return NSAttributedString(string: string)
   }
 
-  return reward.title.coalesceWith("")
+  let attributes: [NSAttributedString.Key: Any] = [
+    .font: UIFont.ksr_title2().bolded
+  ]
+
+  let title = reward.title.coalesceWith("")
+  let titleAttributed = title.attributed(
+    with: UIFont.ksr_title2(),
+    foregroundColor: UIColor.ksr_support_700,
+    attributes: attributes,
+    bolding: [title]
+  )
+
+  guard
+    let backing = project.personalization.backing,
+    // Not the base reward, for that we just return the title without quantity.
+    reward.id != backing.reward?.id,
+    let selectedQuantity = selectedRewardQuantities(in: backing)[reward.id],
+    selectedQuantity > 1 else {
+    return titleAttributed
+  }
+
+  let qty = "\(selectedQuantity) x "
+  let qtyAttributed = qty.attributed(
+    with: UIFont.ksr_title2(),
+    foregroundColor: UIColor.ksr_create_700,
+    attributes: attributes,
+    bolding: [title]
+  )
+  return qtyAttributed + titleAttributed
 }
 
-private func pillValues(project: Project, reward: Reward) -> [String] {
+private func pillValues(project: Project, reward: Reward) -> [RewardCardPillData] {
   return [
     timeLeftString(project: project, reward: reward),
     backerCountOrRemainingString(project: project, reward: reward),
-    shippingSummaryString(project: project, reward: reward)
+    shippingSummaryString(project: project, reward: reward),
+    addOnsString(reward: reward)
   ]
   .compact()
 }
 
-private func timeLeftString(project: Project, reward: Reward) -> String? {
+private func addOnsString(reward: Reward) -> RewardCardPillData? {
+  guard reward.hasAddOns else { return nil }
+
+  return RewardCardPillData(
+    backgroundColor: UIColor.ksr_create_700.withAlphaComponent(0.06),
+    text: Strings.Add_ons(),
+    textColor: UIColor.ksr_create_700
+  )
+}
+
+private func timeLeftString(project: Project, reward: Reward) -> RewardCardPillData? {
   let isUnlimitedOrAvailable = reward.limit == nil || reward.remaining ?? 0 > 0
 
   if project.state == .live,
@@ -225,43 +256,65 @@ private func timeLeftString(project: Project, reward: Reward) -> String? {
       useToGo: false
     )
 
-    return Strings.Time_left_left(time_left: time + " " + unit)
+    return RewardCardPillData(
+      backgroundColor: UIColor.ksr_celebrate_100,
+      text: Strings.Time_left_left(time_left: time + " " + unit),
+      textColor: UIColor.ksr_support_400
+    )
   }
 
   return nil
 }
 
-private func backerCountOrRemainingString(project: Project, reward: Reward) -> String? {
+private func backerCountOrRemainingString(project: Project, reward: Reward) -> RewardCardPillData? {
   guard
     let limit = reward.limit,
-    let remaining = reward.remaining,
+    let remaining = rewardLimitRemainingForBacker(project: project, reward: reward),
     remaining > 0,
     project.state == .live
   else {
     let backersCount = reward.backersCount ?? 0
 
-    return backersCount > 0
-      ? Strings.general_backer_count_backers(backer_count: backersCount)
-      : nil
+    return backersCount > 0 ? RewardCardPillData(
+      backgroundColor: UIColor.ksr_create_700.withAlphaComponent(0.06),
+      text: Strings.general_backer_count_backers(backer_count: backersCount),
+      textColor: UIColor.ksr_create_700
+    ) : nil
   }
 
-  return Strings.remaining_count_left_of_limit_count(
-    remaining_count: "\(remaining)",
-    limit_count: "\(limit)"
+  return RewardCardPillData(
+    backgroundColor: UIColor.ksr_celebrate_100,
+    text: Strings.remaining_count_left_of_limit_count(
+      remaining_count: "\(remaining)",
+      limit_count: "\(limit)"
+    ),
+    textColor: UIColor.ksr_support_400
   )
 }
 
-private func shippingSummaryString(project: Project, reward: Reward) -> String? {
+private func shippingSummaryString(project: Project, reward: Reward) -> RewardCardPillData? {
   if project.state == .live, reward.shipping.enabled, let type = reward.shipping.type {
     switch type {
     case .anywhere:
-      return Strings.Ships_worldwide()
+      return RewardCardPillData(
+        backgroundColor: UIColor.ksr_create_700.withAlphaComponent(0.06),
+        text: Strings.Ships_worldwide(),
+        textColor: UIColor.ksr_create_700
+      )
     case .multipleLocations:
-      return Strings.Limited_shipping()
+      return RewardCardPillData(
+        backgroundColor: UIColor.ksr_create_700.withAlphaComponent(0.06),
+        text: Strings.Limited_shipping(),
+        textColor: UIColor.ksr_create_700
+      )
     case .noShipping: return nil
     case .singleLocation:
       if let name = reward.shipping.location?.localizedName {
-        return Strings.location_name_only(location_name: name)
+        return RewardCardPillData(
+          backgroundColor: UIColor.ksr_create_700.withAlphaComponent(0.06),
+          text: Strings.location_name_only(location_name: name),
+          textColor: UIColor.ksr_create_700
+        )
       }
 
       return nil

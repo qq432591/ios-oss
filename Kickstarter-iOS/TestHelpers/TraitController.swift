@@ -13,7 +13,6 @@ internal enum Orientation {
   case landscape
 }
 
-// swiftlint:disable:next cyclomatic_complexity
 internal func traitControllers(
   device: Device = .phone4_7inch,
   orientation: Orientation = .portrait,
@@ -105,8 +104,8 @@ internal func traitControllers(
 
   child.view.frame = parent.view.frame
 
-  parent.view.backgroundColor = .white
-  child.view.backgroundColor = .white
+  parent.view.backgroundColor = .ksr_white
+  child.view.backgroundColor = .ksr_white
 
   let allTraits = UITraitCollection.init(traitsFrom: [traits, additionalTraits])
   parent.setOverrideTraitCollection(allTraits, forChild: child)

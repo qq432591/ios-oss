@@ -27,13 +27,14 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
   @IBOutlet fileprivate var fundingProgressContainerView: UIView!
   @IBOutlet fileprivate var fundingSubtitleLabel: UILabel!
   @IBOutlet fileprivate var fundingTitleLabel: UILabel!
-  @IBOutlet fileprivate var metadataBackgroundView: UIView!
+  @IBOutlet fileprivate var locationImageView: UIImageView!
+  @IBOutlet fileprivate var locationLabel: UILabel!
+  @IBOutlet fileprivate var locationStackView: UIStackView!
   @IBOutlet fileprivate var metadataIconImageView: UIImageView!
   @IBOutlet fileprivate var metadataLabel: UILabel!
   @IBOutlet fileprivate var metadataStackView: UIStackView!
   @IBOutlet fileprivate var metadataView: UIView!
   @IBOutlet fileprivate var projectImageView: UIImageView!
-  @IBOutlet fileprivate var projectInfoStackView: UIStackView!
   @IBOutlet fileprivate var projectNameAndBlurbLabel: UILabel!
   @IBOutlet fileprivate var projectStateSubtitleLabel: UILabel!
   @IBOutlet fileprivate var projectCategoriesStackView: UIStackView!
@@ -44,6 +45,7 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
   @IBOutlet fileprivate var socialAvatarImageView: UIImageView!
   @IBOutlet fileprivate var socialLabel: UILabel!
   @IBOutlet fileprivate var socialStackView: UIStackView!
+  @IBOutlet fileprivate var projectStatsSocialLocationStackView: UIStackView!
 
   fileprivate weak var projectCategoryView: DiscoveryProjectCategoryView!
   fileprivate weak var projectIsStaffPickView: DiscoveryProjectCategoryView!
@@ -137,30 +139,30 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
       self.backersTitleLabel, self.backersSubtitleLabel, self.deadlineTitleLabel,
       self.deadlineSubtitleLabel
     ]
-      ||> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      ||> UILabel.lens.textColor .~ .ksr_support_400
 
     _ = self.backersSubtitleLabel
       |> UILabel.lens.text %~ { _ in Strings.discovery_baseball_card_stats_backers() }
 
     _ = self.fundingTitleLabel
       |> postcardStatsTitleStyle
-      |> UILabel.lens.textColor .~ .ksr_green_700
+      |> UILabel.lens.textColor .~ .ksr_create_700
 
     _ = self.fundingSubtitleLabel
       |> UILabel.lens.text %~ { _ in Strings.discovery_baseball_card_stats_funded() }
-      |> UILabel.lens.textColor .~ .ksr_green_700
+      |> UILabel.lens.textColor .~ .ksr_create_700
 
     _ = self.cardView
       |> cardStyle()
 
     _ = self.fundingProgressContainerView
-      |> UIView.lens.backgroundColor .~ .ksr_navy_400
+      |> UIView.lens.backgroundColor .~ .ksr_support_300
 
     _ = self.fundingProgressBarView
-      |> UIView.lens.backgroundColor .~ .ksr_green_700
+      |> UIView.lens.backgroundColor .~ .ksr_create_700
 
     _ = self.metadataIconImageView
-      |> UIImageView.lens.tintColor .~ .ksr_dark_grey_500
+      |> UIImageView.lens.tintColor .~ .ksr_support_400
 
     _ = self.metadataLabel
       |> postcardMetadataLabelStyle
@@ -168,22 +170,25 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
     _ = self.metadataStackView
       |> postcardMetadataStackViewStyle
 
-    _ = self.metadataBackgroundView
+    _ = self.metadataView
       |> cardStyle()
+      |> \.layoutMargins .~ .init(all: Styles.grid(1))
 
     _ = self.projectImageView
       |> ignoresInvertColorsImageViewStyle
 
-    _ = self.projectInfoStackView
-      |> UIStackView.lens.spacing .~ Styles.grid(4)
+    _ = self.projectStatsSocialLocationStackView
+      |> UIStackView.lens.spacing .~ Styles.grid(3)
+      |> UIStackView.lens.layoutMargins .~ .init(topBottom: Styles.grid(4), leftRight: Styles.grid(3))
+      |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
 
     _ = self.projectNameAndBlurbLabel
       |> UILabel.lens.numberOfLines .~ 3
       |> UILabel.lens.lineBreakMode .~ .byTruncatingTail
-      |> UILabel.lens.backgroundColor .~ .white
+      |> UILabel.lens.backgroundColor .~ .ksr_white
 
     _ = self.projectStateSubtitleLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_body(size: 13)
       |> UILabel.lens.numberOfLines .~ 1
       |> UILabel.lens.lineBreakMode .~ .byTruncatingTail
@@ -208,18 +213,21 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
 
     _ = self.socialLabel
       |> UILabel.lens.numberOfLines .~ 2
-      |> UILabel.lens.textColor .~ .ksr_text_navy_600
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_headline(size: 13.0)
 
     _ = self.socialStackView
       |> UIStackView.lens.alignment .~ .center
       |> UIStackView.lens.spacing .~ Styles.grid(1)
-      |> UIStackView.lens.layoutMargins
-      .~ .init(
-        top: 0.0, left: Styles.grid(4),
-        bottom: Styles.grid(2), right: Styles.grid(2)
-      )
-      |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
+
+    _ = self.locationStackView
+      |> locationStackViewStyle
+
+    _ = self.locationLabel
+      |> locationLabelStyle
+
+    _ = self.locationImageView
+      |> locationImageViewStyle
   }
 
   internal override func bindViewModel() {
@@ -234,6 +242,8 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
     self.fundingProgressContainerView.rac.hidden = self.viewModel.outputs.fundingProgressContainerViewHidden
     self.fundingProgressBarView.rac.hidden = self.viewModel.outputs.fundingProgressBarViewHidden
     self.fundingTitleLabel.rac.text = self.viewModel.outputs.percentFundedTitleLabelText
+    self.locationLabel.rac.text = self.viewModel.outputs.locationLabelText
+    self.locationStackView.rac.hidden = self.viewModel.outputs.locationStackViewHidden
     self.metadataLabel.rac.text = self.viewModel.outputs.metadataLabelText
     self.metadataLabel.rac.textColor = self.viewModel.outputs.metadataTextColor
     self.metadataIconImageView.rac.tintColor = self.viewModel.outputs.metadataIconImageViewTintColor
@@ -291,7 +301,7 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.projectImageURL
       .observeForUI()
       .on(event: { [weak self] _ in
-        self?.projectImageView.af_cancelImageRequest()
+        self?.projectImageView.af.cancelImageRequest()
         self?.projectImageView.image = nil
       })
       .skipNil()
@@ -308,7 +318,7 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.socialImageURL
       .observeForUI()
       .on(event: { [weak self] _ in
-        self?.socialAvatarImageView.af_cancelImageRequest()
+        self?.socialAvatarImageView.af.cancelImageRequest()
         self?.socialAvatarImageView.image = nil
       })
       .skipNil()
@@ -332,11 +342,12 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
   }
 
   internal func configureWith(value: DiscoveryProjectCellRowValue) {
-    self.viewModel.inputs.configureWith(project: value.project, category: value.category)
+    self.viewModel.inputs.configure(with: value)
+
     self.watchProjectViewModel.inputs.configure(with: (
       value.project,
-      Koala.LocationContext.discovery,
-      value.discoveryParams
+      KSRAnalytics.PageContext.discovery,
+      value.params
     ))
   }
 
@@ -347,8 +358,8 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
       guard let strongSelf = self else { return }
 
       strongSelf.cardView.layer.shadowPath = UIBezierPath.init(rect: strongSelf.cardView.bounds).cgPath
-      strongSelf.metadataBackgroundView.layer.shadowPath =
-        UIBezierPath.init(rect: strongSelf.metadataBackgroundView.bounds).cgPath
+      strongSelf.metadataView.layer.shadowPath =
+        UIBezierPath.init(rect: strongSelf.metadataView.bounds).cgPath
     }
   }
 
@@ -359,4 +370,28 @@ internal final class DiscoveryPostcardCell: UITableViewCell, ValueCell {
   @objc fileprivate func saveButtonTapped(_ button: UIButton) {
     self.watchProjectViewModel.inputs.saveButtonTapped(selected: button.isSelected)
   }
+}
+
+// MARK: - Styles
+
+private let locationStackViewStyle: StackViewStyle = { stackView in
+  stackView
+    |> \.alignment .~ .center
+    |> \.distribution .~ .fill
+    |> \.spacing .~ Styles.grid(1)
+}
+
+private let locationLabelStyle: LabelStyle = { label in
+  label
+    |> \.font .~ .ksr_footnote()
+    |> \.textColor .~ .ksr_support_400
+    |> \.lineBreakMode .~ .byTruncatingTail
+    |> \.numberOfLines .~ 1
+}
+
+private let locationImageViewStyle: ImageViewStyle = { imageView in
+  imageView
+    |> UIImageView.lens.image .~ Library.image(named: "location-icon")
+    |> \.tintColor .~ .ksr_support_400
+    |> \.contentMode .~ .scaleAspectFit
 }

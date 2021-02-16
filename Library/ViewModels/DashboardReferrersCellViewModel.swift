@@ -163,7 +163,7 @@ public final class DashboardReferrersCellViewModel: DashboardReferrersCellViewMo
     )
 
     let allReferrersRowData = Signal.combineLatest(country, allReferrers)
-      .map { ReferrersRowData(country: $0, referrers: $1) }
+      .map(ReferrersRowData.init)
 
     let showMoreReferrersButtonIsHidden = Signal.merge(
       referrers.map { $0.count < 6 },
@@ -182,12 +182,6 @@ public final class DashboardReferrersCellViewModel: DashboardReferrersCellViewMo
       .skipRepeats(==)
 
     self.notifyDelegateAddedReferrerRows = self.showMoreReferrersTappedProperty.signal
-
-    cumulativeProjectStats
-      .takeWhen(self.showMoreReferrersTappedProperty.signal)
-      .observeValues { _, project, _, _ in
-        AppEnvironment.current.koala.trackDashboardSeeMoreReferrers(project: project)
-      }
   }
 
   fileprivate let awakeFromNibProperty = MutableProperty(())

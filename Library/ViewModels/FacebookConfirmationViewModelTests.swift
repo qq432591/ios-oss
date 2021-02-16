@@ -3,7 +3,6 @@
 import ReactiveExtensions
 import ReactiveExtensions_TestHelpers
 import ReactiveSwift
-// swiftlint:disable force_unwrapping
 import XCTest
 
 final class FacebookConfirmationViewModelTests: TestCase {
@@ -42,7 +41,11 @@ final class FacebookConfirmationViewModelTests: TestCase {
 
     self.sendNewsletters.assertValues([false], "Newsletter toggle emits false")
     XCTAssertEqual(
-      [], trackingClient.events,
+      [], self.dataLakeTrackingClient.events,
+      "Newsletter toggle is not tracked on intital state"
+    )
+    XCTAssertEqual(
+      [], self.segmentTrackingClient.events,
       "Newsletter toggle is not tracked on intital state"
     )
   }
@@ -65,7 +68,11 @@ final class FacebookConfirmationViewModelTests: TestCase {
 
       sendNewsletters.assertValues([false], "Newsletter toggle emits false")
       XCTAssertEqual(
-        [], trackingClient.events,
+        [], self.dataLakeTrackingClient.events,
+        "Newsletter toggle is not tracked on intital state"
+      )
+      XCTAssertEqual(
+        [], self.segmentTrackingClient.events,
         "Newsletter toggle is not tracked on intital state"
       )
     }
@@ -76,30 +83,10 @@ final class FacebookConfirmationViewModelTests: TestCase {
     self.vm.inputs.sendNewslettersToggled(false)
 
     self.sendNewsletters.assertValues([false, false], "Newsletter is toggled off")
-    XCTAssertEqual(
-      [
-        "Unsubscribed From Newsletter",
-        "Signup Newsletter Toggle"
-      ],
-      self.trackingClient.events,
-      "Newsletter toggle is tracked"
-    )
-    XCTAssertEqual(false, trackingClient.properties.last!["send_newsletters"] as? Bool)
 
     self.vm.inputs.sendNewslettersToggled(true)
 
     self.sendNewsletters.assertValues([false, false, true], "Newsletter is toggled on")
-    XCTAssertEqual(
-      [
-        "Unsubscribed From Newsletter",
-        "Signup Newsletter Toggle",
-        "Subscribed To Newsletter",
-        "Signup Newsletter Toggle"
-      ],
-      self.trackingClient.events,
-      "Newsletter toggle is tracked"
-    )
-    XCTAssertEqual(true, trackingClient.properties.last!["send_newsletters"] as? Bool)
   }
 
   func testCreateNewAccount_withoutNewsletterToggle() {
@@ -134,11 +121,6 @@ final class FacebookConfirmationViewModelTests: TestCase {
     self.postNotification.assertValues(
       [.ksr_sessionStarted],
       "Login notification posted."
-    )
-
-    XCTAssertEqual(
-      ["Subscribed To Newsletter", "Signup Newsletter Toggle"],
-      self.trackingClient.events
     )
   }
 

@@ -7,7 +7,7 @@ public typealias Month = UInt
 public typealias Year = UInt
 public typealias CardDetails = (
   cardNumber: String, expMonth: Month?, expYear: Year?, cvc: String?,
-  cardBrand: GraphUserCreditCard.CreditCardType?
+  cardBrand: CreditCardType?
 )
 public typealias PaymentDetails = (
   cardholderName: String, cardNumber: String, expMonth: Month, expYear: Year,
@@ -25,7 +25,6 @@ public protocol AddNewCardViewModelInputs {
   func stripeCreated(_ token: String?, stripeID: String?)
   func stripeError(_ error: Error?)
   func viewDidLoad()
-  func viewWillAppear()
   func zipcodeChanged(zipcode: String?)
   func zipcodeTextFieldDidEndEditing()
 }
@@ -57,7 +56,7 @@ public final class AddNewCardViewModel: AddNewCardViewModelType, AddNewCardViewM
     let cardholderName = self.cardholderNameChangedProperty.signal.skipNil()
     let creditCardDetails = self.creditCardChangedProperty.signal
       .skipNil()
-      .filterMap { cardDetails -> (String, UInt, UInt, String)? in
+      .compactMap { cardDetails -> (String, UInt, UInt, String)? in
         guard let expMonth = cardDetails.expMonth, let expYear = cardDetails.expYear,
           let cvc = cardDetails.cvc else {
           return nil
@@ -200,22 +199,6 @@ public final class AddNewCardViewModel: AddNewCardViewModelType, AddNewCardViewM
     )
 
     self.rememberThisCardToggleViewControllerContainerIsHidden = intent.map { $0 == .settings }
-
-    // Koala
-    self.viewWillAppearProperty.signal
-      .observeValues {
-        AppEnvironment.current.koala.trackViewedAddNewCard()
-      }
-
-    self.newCardAddedWithMessage
-      .observeValues { _ in
-        AppEnvironment.current.koala.trackSavedPaymentMethod()
-      }
-
-    self.addNewCardFailure
-      .observeValues { _ in
-        AppEnvironment.current.koala.trackFailedPaymentMethodCreation()
-      }
   }
 
   private let cardholderNameChangedProperty = MutableProperty<String?>(nil)
@@ -270,11 +253,6 @@ public final class AddNewCardViewModel: AddNewCardViewModelType, AddNewCardViewM
     self.viewDidLoadProperty.value = ()
   }
 
-  private let viewWillAppearProperty = MutableProperty(())
-  public func viewWillAppear() {
-    self.viewWillAppearProperty.value = ()
-  }
-
   private let zipcodeProperty = MutableProperty<String?>(nil)
   public func zipcodeChanged(zipcode: String?) {
     self.zipcodeProperty.value = zipcode
@@ -303,8 +281,8 @@ public final class AddNewCardViewModel: AddNewCardViewModelType, AddNewCardViewM
   public var outputs: AddNewCardViewModelOutputs { return self }
 }
 
-private func cardBrandIsSupported(project: Project?, cardBrand: GraphUserCreditCard.CreditCardType) -> Bool {
-  let supportedCardBrands: [GraphUserCreditCard.CreditCardType] = [
+private func cardBrandIsSupported(project: Project?, cardBrand: CreditCardType) -> Bool {
+  let supportedCardBrands: [CreditCardType] = [
     .amex,
     .diners,
     .discover,
@@ -319,7 +297,7 @@ private func cardBrandIsSupported(project: Project?, cardBrand: GraphUserCreditC
   }
 
   let availableCreditCardTypes = availableCardTypes
-    .compactMap { GraphUserCreditCard.CreditCardType(rawValue: $0) }
+    .compactMap { CreditCardType(rawValue: $0) }
 
   return availableCreditCardTypes.contains(cardBrand)
 }

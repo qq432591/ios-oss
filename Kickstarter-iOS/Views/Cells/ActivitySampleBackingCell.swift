@@ -35,6 +35,7 @@ internal final class ActivitySampleBackingCell: UITableViewCell, ValueCell {
 
     _ = self
       |> activitySampleCellStyle
+      |> \.backgroundColor .~ discoveryPageBackgroundColor()
       |> UITableViewCell.lens.accessibilityHint %~ { _ in
         Strings.dashboard_tout_accessibility_hint_opens_project()
       }
@@ -67,7 +68,7 @@ internal final class ActivitySampleBackingCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.backerImageURL
       .observeForUI()
       .on(event: { [weak self] _ in
-        self?.backerImageView.af_cancelImageRequest()
+        self?.backerImageView.af.cancelImageRequest()
         self?.backerImageView.image = nil
       })
       .skipNil()

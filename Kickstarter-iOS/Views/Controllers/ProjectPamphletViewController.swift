@@ -20,7 +20,7 @@ public final class ProjectPamphletViewController: UIViewController, MessageBanne
   internal weak var delegate: ProjectPamphletViewControllerDelegate?
   fileprivate let viewModel: ProjectPamphletViewModelType = ProjectPamphletViewModel()
 
-  internal var messageBannerViewController: MessageBannerViewController?
+  public var messageBannerViewController: MessageBannerViewController?
   fileprivate var navBarController: ProjectNavBarViewController!
   fileprivate var contentController: ProjectPamphletContentViewController!
 
@@ -76,7 +76,7 @@ public final class ProjectPamphletViewController: UIViewController, MessageBanne
   public override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     self.setInitial(
-      constraints: [navBarTopConstraint],
+      constraints: [self.navBarTopConstraint],
       constant: self.initialTopConstraint
     )
 
@@ -124,8 +124,8 @@ public final class ProjectPamphletViewController: UIViewController, MessageBanne
 
     self.viewModel.outputs.goToManagePledge
       .observeForControllerAction()
-      .observeValues { [weak self] project in
-        self?.goToManageViewPledge(project: project)
+      .observeValues { [weak self] params in
+        self?.goToManagePledge(params: params)
       }
 
     self.viewModel.outputs.configureChildViewControllersWithProject
@@ -197,10 +197,10 @@ public final class ProjectPamphletViewController: UIViewController, MessageBanne
     self.present(vc, animated: true)
   }
 
-  private func goToManageViewPledge(project: Project) {
+  private func goToManagePledge(params: ManagePledgeViewParamConfigData) {
     let vc = ManagePledgeViewController.instantiate()
       |> \.delegate .~ self
-    vc.configureWith(project: project)
+    vc.configureWith(params: params)
 
     let nc = RewardPledgeNavigationController(rootViewController: vc)
 

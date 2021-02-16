@@ -35,6 +35,7 @@ internal final class ActivitySampleFollowCell: UITableViewCell, ValueCell {
 
     _ = self
       |> activitySampleCellStyle
+      |> \.backgroundColor .~ discoveryPageBackgroundColor()
 
     _ = self.activityStackView
       |> activitySampleStackViewStyle
@@ -66,12 +67,12 @@ internal final class ActivitySampleFollowCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.friendImageURL
       .observeForUI()
       .on(event: { [weak self] _ in
-        self?.friendImageView.af_cancelImageRequest()
+        self?.friendImageView.af.cancelImageRequest()
         self?.friendImageView.image = nil
       })
       .skipNil()
       .observeValues { [weak self] url in
-        self?.friendImageView.af_setImage(withURL: url)
+        self?.friendImageView.af.setImage(withURL: url)
       }
 
     self.viewModel.outputs.goToActivity

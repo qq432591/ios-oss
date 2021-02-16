@@ -58,7 +58,7 @@ public final class DiscoveryFiltersViewModel: DiscoveryFiltersViewModelType,
   public init() {
     let initialTopFilters = self.viewDidLoadProperty.signal
       .take(first: 1)
-      .map { topFilters(forUser: AppEnvironment.current.currentUser) }
+      .map { _ in topFilters(forUser: AppEnvironment.current.currentUser) }
 
     let initialSelectedRow = Signal.combineLatest(
       self.initialSelectedRowProperty.signal.skipNil(),
@@ -156,7 +156,9 @@ public final class DiscoveryFiltersViewModel: DiscoveryFiltersViewModelType,
     self.animateInView = self.viewDidAppearProperty.signal
 
     self.notifyDelegateOfSelectedRow
-      .observeValues { AppEnvironment.current.koala.trackDiscoveryModalSelectedFilter(params: $0.params) }
+      .observeValues {
+        AppEnvironment.current.ksrAnalytics.trackDiscoveryModalSelectedFilter(params: $0.params)
+      }
   }
 
   fileprivate let initialSelectedRowProperty = MutableProperty<SelectableRow?>(nil)

@@ -1,4 +1,3 @@
-import Argo
 import KsApi
 import Library
 import Prelude
@@ -46,19 +45,11 @@ public protocol AppDelegateViewModelInputs {
   /// Call when the application receives a request to perform a shortcut action.
   func applicationPerformActionForShortcutItem(_ item: UIApplicationShortcutItem)
 
-  /// Call when the app has crashed
-  func crashManagerDidFinishSendingCrashReport()
-
-  /// Call after having invoked AppEnvironemt.updateCurrentUser with a fresh user.
+  /// Call after having invoked AppEnvironment.updateCurrentUser with a fresh user.
   func currentUserUpdatedInEnvironment()
 
   /// Call when the user taps "OK" from the contextual alert.
   func didAcceptReceivingRemoteNotifications()
-
-  /// Call with the result of evaluating Qualtrics Targeting Logic and current Qualtrics.Properties
-  func didEvaluateQualtricsTargetingLogic(
-    with result: QualtricsResultType, properties: QualtricsPropertiesType
-  )
 
   /// Call when the app delegate receives a remote notification.
   func didReceive(remoteNotification notification: [AnyHashable: Any])
@@ -76,10 +67,16 @@ public protocol AppDelegateViewModelInputs {
   func foundRedirectUrl(_ url: URL)
 
   /// Call when Optimizely has been configured with the given result
-  func optimizelyConfigured(with result: OptimizelyResultType) -> Bool
+  func optimizelyConfigured(with result: OptimizelyResultType) -> Error?
 
-  /// Call with the result from initializing Qualtrics
-  func qualtricsInitialized(with result: QualtricsResultType)
+  /// Call when Optimizely configuration has failed
+  func optimizelyClientConfigurationFailed()
+
+  /// Call when the Perimeter X manager is ready
+  func perimeterXManagerReady(with headers: [AnyHashable: Any]?)
+
+  /// Call when a refresh to Perimeter X headers has occurred
+  func perimeterXNewHeaders(with headers: [AnyHashable: Any]?)
 
   /// Call when the contextual PushNotification dialog should be presented.
   func showNotificationDialog(notification: Notification)
@@ -101,23 +98,17 @@ public protocol AppDelegateViewModelOutputs {
   /// Emits an app secret that should be used to configure AppCenter.
   var configureAppCenterWithData: Signal<AppCenterConfigData, Never> { get }
 
-  /// Emits when the application should configure Fabric
-  var configureFabric: Signal<(), Never> { get }
+  /// Emits when the application should configure Firebase
+  var configureFirebase: Signal<(), Never> { get }
 
   /// Emits when the application should configure Optimizely
   var configureOptimizely: Signal<(String, OptimizelyLogLevelType, TimeInterval), Never> { get }
 
-  /// Emits when the application should configure Qualtrics
-  var configureQualtrics: Signal<QualtricsConfigData, Never> { get }
-
   /// Return this value in the delegate method.
   var continueUserActivityReturnValue: MutableProperty<Bool> { get }
 
-  /// Emits when we should display the Qualtrics survey.
-  var displayQualtricsSurvey: Signal<(), Never> { get }
-
-  /// Emits when we should ask Qualtrics to evaluate its targeting logic.
-  var evaluateQualtricsTargetingLogic: Signal<(), Never> { get }
+  /// Emits the response from email verification with a message and success/failure.
+  var emailVerificationCompleted: Signal<(String, Bool), Never> { get }
 
   /// Emits when the view needs to figure out the redirect URL for the emitted URL.
   var findRedirectUrl: Signal<URL, Never> { get }
@@ -143,8 +134,8 @@ public protocol AppDelegateViewModelOutputs {
   /// Emits when the root view controller should present the Landing Page for new users.
   var goToLandingPage: Signal<(), Never> { get }
 
-  /// Emits when the root view controller should navigate to the login screen.
-  var goToLogin: Signal<(), Never> { get }
+  /// Emits when the root view controller should present the login modal.
+  var goToLoginWithIntent: Signal<LoginIntent, Never> { get }
 
   /// Emits a message thread when we should navigate to it.
   var goToMessageThread: Signal<MessageThread, Never> { get }
@@ -160,6 +151,12 @@ public protocol AppDelegateViewModelOutputs {
 
   /// Emits when the root view controller should navigate to search.
   var goToSearch: Signal<(), Never> { get }
+
+  /// Emits when PerimeterXs first set of headers are available.
+  var perimeterXInitialHeaders: Signal<[AnyHashable: Any]?, Never> { get }
+
+  /// Emits when PerimeterXs headers have been refreshed
+  var perimeterXRefreshedHeaders: Signal<[AnyHashable: Any]?, Never> { get }
 
   /// Emits an Notification that should be immediately posted.
   var postNotification: Signal<Notification, Never> { get }
@@ -199,7 +196,6 @@ public protocol AppDelegateViewModelType {
 
 public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateViewModelInputs,
   AppDelegateViewModelOutputs {
-  // swiftlint:disable cyclomatic_complexity
   public init() {
     let currentUserEvent = Signal
       .merge(
@@ -248,10 +244,15 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
     let optimizelyClientConfiguredNotification = self.didUpdateOptimizelyClientProperty.signal
       .mapConst(Notification(name: .ksr_optimizelyClientConfigured, object: nil))
 
+    let optimizelyClientConfigurationFailedNotification = self.optimizelyClientConfigurationFailedProperty
+      .signal
+      .mapConst(Notification(name: .ksr_optimizelyClientConfigurationFailed, object: nil))
+
     self.postNotification = Signal.merge(
       currentUserUpdatedNotification,
       configUpdatedNotification,
-      optimizelyClientConfiguredNotification
+      optimizelyClientConfiguredNotification,
+      optimizelyClientConfigurationFailedNotification
     )
 
     let openUrl = self.applicationOpenUrlProperty.signal.skipNil()
@@ -259,6 +260,11 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
     // iCloud
 
     self.synchronizeUbiquitousStore = self.applicationLaunchOptionsProperty.signal.ignoreValues()
+
+    // PerimeterX
+
+    self.perimeterXInitialHeaders = self.perimeterXManagerReadyProperty.signal
+    self.perimeterXRefreshedHeaders = self.perimeterXNewHeadersProperty.signal
 
     // Push notifications
 
@@ -310,8 +316,7 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
     // Deep links
 
     let deepLinkFromNotification = self.remoteNotificationProperty.signal.skipNil()
-      .map(decode)
-      .map { $0.value }
+      .map(PushEnvelope.decodeJSONDictionary)
       .skipNil()
       .map(navigation(fromPushEnvelope:))
 
@@ -363,6 +368,20 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
       .filter { _ in shouldGoToLandingPage() == false && shouldSeeCategoryPersonalization() == false }
       .take(until: self.goToLandingPage)
 
+    let emailVerificationEvent = deepLinkUrl
+      .filter { Navigation.match($0) == .profile(.verifyEmail) }
+      .map(accessTokenFromUrl)
+      .skipNil()
+      .switchMap { accessToken in
+        AppEnvironment.current.apiService.verifyEmail(withToken: accessToken)
+          .ksr_delay(AppEnvironment.current.apiDelayInterval, on: AppEnvironment.current.scheduler)
+          .materialize()
+      }
+
+    self.emailVerificationCompleted = emailVerificationEvent
+      .map(emailVerificationCompletionData)
+      .skipNil()
+
     self.findRedirectUrl = deepLinkUrl
       .filter { Navigation.match($0) == .emailClick }
 
@@ -375,12 +394,12 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
       .switchMap { rawParams -> SignalProducer<DiscoveryParams?, Never> in
         guard
           let rawParams = rawParams,
-          let params = DiscoveryParams.decode(.init(rawParams)).value
+          let params = DiscoveryParams.decodeJSONDictionary(rawParams)
         else { return .init(value: nil) }
 
         guard
           let rawCategoryParam = rawParams["category_id"],
-          let categoryParam = Param.decode(.string(rawCategoryParam)).value
+          let categoryParam = .some(Param.slug(rawCategoryParam))
         else { return .init(value: params) }
         // We will replace `fetchGraph(query: rootCategoriesQuery)` by a call to get a category by ID
         return AppEnvironment.current.apiService.fetchGraphCategories(query: rootCategoriesQuery)
@@ -388,6 +407,53 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
           .ksr_delay(AppEnvironment.current.apiDelayInterval, on: AppEnvironment.current.scheduler)
           .demoteErrors()
           .map { params |> DiscoveryParams.lens.category .~ $0.first }
+      }
+
+    let projectLinkValues = deepLink
+      .map { link -> (Param, Navigation.Project, RefTag?)? in
+        guard case let .project(param, subpage, refTag) = link else { return nil }
+        return (param, subpage, refTag)
+      }
+      .skipNil()
+      .switchMap { param, subpage, refTag in
+        AppEnvironment.current.apiService.fetchProject(param: param)
+          .demoteErrors()
+          .observeForUI()
+          .map { project -> (Project, Navigation.Project, [UIViewController], RefTag?) in
+            (
+              project, subpage,
+              [ProjectPamphletViewController.configuredWith(projectOrParam: .left(project), refTag: refTag)],
+              refTag
+            )
+          }
+      }
+
+    let projectLink = projectLinkValues
+      .filter { project, _, _, _ in project.prelaunchActivated != true }
+
+    let projectPreviewLink = projectLinkValues
+      .filter { project, _, _, _ in project.prelaunchActivated == true }
+
+    let fixErroredPledgeLinkAndIsLoggedIn = projectLink
+      .filter { _, subpage, _, _ in subpage == .pledge(.manage) }
+      .map { project, _, vcs, _ in
+        (project, vcs, AppEnvironment.current.currentUser != nil)
+      }
+
+    let fixErroredPledgeLink = fixErroredPledgeLinkAndIsLoggedIn
+      .filter(third >>> isTrue)
+      .map { project, vcs, _ -> [UIViewController]? in
+        guard let backingId = project.personalization.backing?.id else { return nil }
+        let vc = ManagePledgeViewController.instantiate()
+        let params: ManagePledgeViewParamConfigData = (.id(project.id), .id(backingId))
+        vc.configureWith(params: params)
+        return vcs + [vc]
+      }
+      .skipNil()
+      .map { vcs -> RewardPledgeNavigationController in
+        let nav = RewardPledgeNavigationController(nibName: nil, bundle: nil)
+        nav.viewControllers = vcs
+        return nav
       }
 
     self.goToActivity = deepLink
@@ -398,9 +464,14 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
       .filter { $0 == .tab(.search) }
       .ignoreValues()
 
-    self.goToLogin = deepLink
+    let goToLogin = deepLink
       .filter { $0 == .tab(.login) }
       .ignoreValues()
+
+    self.goToLoginWithIntent = Signal.merge(
+      fixErroredPledgeLinkAndIsLoggedIn.filter(third >>> isFalse).mapConst(.erroredPledge),
+      goToLogin.mapConst(.generic)
+    )
 
     self.goToCreatorMessageThread = deepLink
       .map { navigation -> (Param, Int)? in
@@ -436,31 +507,6 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
     self.goToProfile = deepLink
       .filter { $0 == .tab(.me) }
       .ignoreValues()
-
-    let projectLinkValues = deepLink
-      .map { link -> (Param, Navigation.Project, RefTag?)? in
-        guard case let .project(param, subpage, refTag) = link else { return nil }
-        return (param, subpage, refTag)
-      }
-      .skipNil()
-      .switchMap { param, subpage, refTag in
-        AppEnvironment.current.apiService.fetchProject(param: param)
-          .demoteErrors()
-          .observeForUI()
-          .map { project -> (Project, Navigation.Project, [UIViewController], RefTag?) in
-            (
-              project, subpage,
-              [ProjectPamphletViewController.configuredWith(projectOrParam: .left(project), refTag: refTag)],
-              refTag
-            )
-          }
-      }
-
-    let projectLink = projectLinkValues
-      .filter { project, _, _, _ in project.prelaunchActivated != true }
-
-    let projectPreviewLink = projectLinkValues
-      .filter { project, _, _, _ in project.prelaunchActivated == true }
 
     let resolvedRedirectUrl = deepLinkUrl
       .filter { Navigation.deepLinkMatch($0) == nil }
@@ -505,8 +551,8 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
 
     let campaignFaqLink = projectLink
       .filter { _, subpage, _, _ in subpage == .faqs }
-      .map { project, _, vcs, refTag in
-        vcs + [ProjectDescriptionViewController.configuredWith(value: (project, refTag))]
+      .map { project, _, vcs, _ in
+        vcs + [ProjectDescriptionViewController.configuredWith(value: project)]
       }
 
     let updatesLink = projectLink
@@ -551,7 +597,7 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
       }
       .skipNil()
 
-    self.presentViewController = Signal
+    let viewControllersContainedInNavigationController = Signal
       .merge(
         projectRootLink,
         projectCommentsLink,
@@ -563,7 +609,12 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
       )
       .map { UINavigationController() |> UINavigationController.lens.viewControllers .~ $0 }
 
-    self.configureFabric = self.applicationLaunchOptionsProperty.signal.ignoreValues()
+    self.presentViewController = Signal.merge(
+      viewControllersContainedInNavigationController.map { $0 as UIViewController },
+      fixErroredPledgeLink.map { $0 as UIViewController }
+    )
+
+    self.configureFirebase = self.applicationLaunchOptionsProperty.signal.ignoreValues()
 
     self.configureOptimizely = self.applicationLaunchOptionsProperty.signal
       .map { _ in AppEnvironment.current }
@@ -594,80 +645,6 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
       .skipNil()
       .map { _, options in options?[UIApplication.LaunchOptionsKey.shortcutItem] == nil }
 
-    // Koala
-
-    Signal.combineLatest(
-      pushTokenRegistrationStartedValues,
-      pushNotificationsPreviouslyAuthorized
-    )
-    .filter { _, previouslyAuthorized in !previouslyAuthorized }
-    .map { isGranted, _ in isGranted }
-    .take(first: 1)
-    .observeValues { isGranted in
-      if isGranted {
-        AppEnvironment.current.koala.trackPushPermissionOptIn()
-      } else {
-        AppEnvironment.current.koala.trackPushPermissionOptOut()
-      }
-    }
-
-    Signal.merge(
-      self.applicationLaunchOptionsProperty.signal.ignoreValues(),
-      self.applicationWillEnterForegroundProperty.signal
-    )
-    .observeValues { AppEnvironment.current.koala.trackAppOpen() }
-
-    self.applicationDidEnterBackgroundProperty.signal
-      .observeValues { AppEnvironment.current.koala.trackAppClose() }
-
-    self.applicationDidReceiveMemoryWarningProperty.signal
-      .observeValues { AppEnvironment.current.koala.trackMemoryWarning() }
-
-    self.crashManagerDidFinishSendingCrashReportProperty.signal
-      .observeValues { AppEnvironment.current.koala.trackCrashedApp() }
-
-    Signal.combineLatest(
-      performShortcutItem.enumerated(),
-      self.setApplicationShortcutItems
-    )
-    .skipRepeats { lhs, rhs in lhs.0.idx == rhs.0.idx }
-    .map { idxAndShortcutItem, availableShortcutItems in
-      (idxAndShortcutItem.value, availableShortcutItems)
-    }
-    .observeValues {
-      AppEnvironment.current.koala.trackPerformedShortcutItem($0, availableShortcutItems: $1)
-    }
-
-    openUrl
-      .map { URLComponents(url: $0.url, resolvingAgainstBaseURL: false) }
-      .skipNil()
-      .map(dictionary(fromUrlComponents:))
-      .filter { $0["app_banner"] == "1" }
-      .observeValues { AppEnvironment.current.koala.trackOpenedAppBanner($0) }
-
-    continueUserActivityWithNavigation
-      .filter(second >>> isNotNil)
-      .map(first)
-      .observeValues { AppEnvironment.current.koala.trackUserActivity($0) }
-
-    deepLinkFromNotification
-      .observeValues { _ in AppEnvironment.current.koala.trackNotificationOpened() }
-
-    // Optimizely tracking
-
-    self.applicationDidEnterBackgroundProperty.signal
-      .observeValues {
-        let (properties, eventTags) = optimizelyTrackingAttributesAndEventTags()
-
-        try? AppEnvironment.current.optimizelyClient?
-          .track(
-            eventKey: "App Closed",
-            userId: deviceIdentifier(uuid: UUID()),
-            attributes: properties,
-            eventTags: eventTags
-          )
-      }
-
     self.applicationIconBadgeNumber = Signal.merge(
       self.applicationWillEnterForegroundProperty.signal,
       self.applicationLaunchOptionsProperty.signal.ignoreValues()
@@ -678,30 +655,8 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
 
     self.optimizelyConfigurationReturnValue <~ self.optimizelyConfiguredWithResultProperty.signal
       .skipNil()
-      .map { $0.isSuccess }
-
-    self.configureQualtrics = Signal.zip(
-      self.applicationLaunchOptionsProperty.signal,
-      self.didUpdateConfigProperty.signal
-    )
-    .filter { _ in featureQualtricsIsEnabled() }
-    .ignoreValues()
-    .map(qualtricsConfigData)
-
-    self.evaluateQualtricsTargetingLogic = self.qualtricsInitializedWithResultProperty.signal
-      .skipNil()
-      .filter { $0.passed() }
-      .ksr_delay(.seconds(2), on: AppEnvironment.current.scheduler)
-      .ignoreValues()
-
-    self.displayQualtricsSurvey = self.didEvaluateQualtricsTargetingLogicWithResultProperty.signal
-      .skipNil()
-      .on(value: { _, properties in properties.setNumber(number: 0, for: "first_app_session") })
-      .filter { result, _ in result.passed() }
-      .ignoreValues()
+      .map { $0.hasError }
   }
-
-  // swiftlint:enable cyclomatic_complexity
 
   public var inputs: AppDelegateViewModelInputs { return self }
   public var outputs: AppDelegateViewModelOutputs { return self }
@@ -763,15 +718,6 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
     self.didAcceptReceivingRemoteNotificationsProperty.value = ()
   }
 
-  fileprivate let didEvaluateQualtricsTargetingLogicWithResultProperty
-    = MutableProperty<(QualtricsResultType, QualtricsPropertiesType)?>(nil)
-  public func didEvaluateQualtricsTargetingLogic(
-    with result: QualtricsResultType,
-    properties: QualtricsPropertiesType
-  ) {
-    self.didEvaluateQualtricsTargetingLogicWithResultProperty.value = (result, properties)
-  }
-
   fileprivate let didUpdateConfigProperty = MutableProperty<Config?>(nil)
   public func didUpdateConfig(_ config: Config) {
     self.didUpdateConfigProperty.value = config
@@ -787,11 +733,6 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
     self.foundRedirectUrlProperty.value = url
   }
 
-  fileprivate let crashManagerDidFinishSendingCrashReportProperty = MutableProperty(())
-  public func crashManagerDidFinishSendingCrashReport() {
-    self.crashManagerDidFinishSendingCrashReportProperty.value = ()
-  }
-
   fileprivate typealias ApplicationOpenUrl = (
     application: UIApplication?,
     url: URL,
@@ -805,11 +746,6 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
   ) -> Bool {
     self.applicationOpenUrlProperty.value = (application, url, options)
     return true
-  }
-
-  fileprivate let qualtricsInitializedWithResultProperty = MutableProperty<QualtricsResultType?>(nil)
-  public func qualtricsInitialized(with result: QualtricsResultType) {
-    self.qualtricsInitializedWithResultProperty.value = result
   }
 
   fileprivate let showNotificationDialogProperty = MutableProperty<Notification?>(nil)
@@ -832,23 +768,35 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
     return self.applicationDidFinishLaunchingReturnValueProperty.value
   }
 
-  private let optimizelyConfigurationReturnValue = MutableProperty<Bool>(false)
-
+  private let optimizelyConfigurationReturnValue = MutableProperty<Error?>(nil)
   fileprivate let optimizelyConfiguredWithResultProperty = MutableProperty<OptimizelyResultType?>(nil)
-  public func optimizelyConfigured(with result: OptimizelyResultType) -> Bool {
+  public func optimizelyConfigured(with result: OptimizelyResultType) -> Error? {
     self.optimizelyConfiguredWithResultProperty.value = result
 
     return self.optimizelyConfigurationReturnValue.value
   }
 
+  fileprivate let optimizelyClientConfigurationFailedProperty = MutableProperty(())
+  public func optimizelyClientConfigurationFailed() {
+    self.optimizelyClientConfigurationFailedProperty.value = ()
+  }
+
+  fileprivate let perimeterXManagerReadyProperty = MutableProperty<[AnyHashable: Any]?>(nil)
+  public func perimeterXManagerReady(with headers: [AnyHashable: Any]?) {
+    self.perimeterXManagerReadyProperty.value = headers
+  }
+
+  fileprivate let perimeterXNewHeadersProperty = MutableProperty<[AnyHashable: Any]?>(nil)
+  public func perimeterXNewHeaders(with headers: [AnyHashable: Any]?) {
+    self.perimeterXNewHeadersProperty.value = headers
+  }
+
   public let applicationIconBadgeNumber: Signal<Int, Never>
   public let configureAppCenterWithData: Signal<AppCenterConfigData, Never>
-  public let configureFabric: Signal<(), Never>
+  public let configureFirebase: Signal<(), Never>
   public let configureOptimizely: Signal<(String, OptimizelyLogLevelType, TimeInterval), Never>
-  public let configureQualtrics: Signal<QualtricsConfigData, Never>
   public let continueUserActivityReturnValue = MutableProperty(false)
-  public let displayQualtricsSurvey: Signal<(), Never>
-  public let evaluateQualtricsTargetingLogic: Signal<(), Never>
+  public let emailVerificationCompleted: Signal<(String, Bool), Never>
   public let findRedirectUrl: Signal<URL, Never>
   public let forceLogout: Signal<(), Never>
   public let goToActivity: Signal<(), Never>
@@ -857,12 +805,14 @@ public final class AppDelegateViewModel: AppDelegateViewModelType, AppDelegateVi
   public let goToDashboard: Signal<Param?, Never>
   public let goToDiscovery: Signal<DiscoveryParams?, Never>
   public let goToLandingPage: Signal<(), Never>
-  public let goToLogin: Signal<(), Never>
+  public let goToLoginWithIntent: Signal<LoginIntent, Never>
   public let goToMessageThread: Signal<MessageThread, Never>
   public let goToProfile: Signal<(), Never>
   public let goToProjectActivities: Signal<Param, Never>
   public let goToMobileSafari: Signal<URL, Never>
   public let goToSearch: Signal<(), Never>
+  public let perimeterXInitialHeaders: Signal<[AnyHashable: Any]?, Never>
+  public let perimeterXRefreshedHeaders: Signal<[AnyHashable: Any]?, Never>
   public let postNotification: Signal<Notification, Never>
   public let presentViewController: Signal<UIViewController, Never>
   public let pushTokenRegistrationStarted: Signal<(), Never>
@@ -881,7 +831,6 @@ private func deviceToken(fromData data: Data) -> String {
     .joined()
 }
 
-// swiftlint:disable:next cyclomatic_complexity
 private func navigation(fromPushEnvelope envelope: PushEnvelope) -> Navigation? {
   if let activity = envelope.activity {
     switch activity.category {
@@ -943,6 +892,10 @@ private func navigation(fromPushEnvelope envelope: PushEnvelope) -> Navigation? 
 
   if let update = envelope.update {
     return .project(.id(update.projectId), .update(update.id, .root), refTag: .push)
+  }
+
+  if let erroredPledge = envelope.erroredPledge {
+    return .project(.id(erroredPledge.projectId), .pledge(.manage), refTag: .push)
   }
 
   return nil
@@ -1075,7 +1028,7 @@ private func optimizelyData(for environment: Environment) -> (String, Optimizely
     sdkKey = Secrets.OptimizelySDKKey.production
   case .staging:
     sdkKey = Secrets.OptimizelySDKKey.staging
-  case .development, .local:
+  case .development, .local, .custom:
     sdkKey = Secrets.OptimizelySDKKey.development
   }
 
@@ -1111,22 +1064,6 @@ private func visitorCookies() -> [HTTPCookie] {
     )
   )
   .compact()
-}
-
-private func qualtricsConfigData() -> QualtricsConfigData {
-  return .init(
-    brandId: Secrets.Qualtrics.brandId,
-    zoneId: Secrets.Qualtrics.zoneId,
-    interceptId: QualtricsIntercept.survey.interceptId,
-    stringProperties: [
-      "bundle_id": AppEnvironment.current.mainBundle.bundleIdentifier,
-      "language": AppEnvironment.current.language.rawValue,
-      "logged_in": "\(AppEnvironment.current.currentUser != nil)",
-      "distinct_id": AppEnvironment.current.device.identifierForVendor?.uuidString,
-      "user_uid": AppEnvironment.current.currentUser.flatMap { $0.id }.map(String.init)
-    ]
-    .compact()
-  )
 }
 
 private func shouldSeeCategoryPersonalization() -> Bool {
@@ -1171,4 +1108,26 @@ private func shouldGoToLandingPage() -> Bool {
   case .control, nil:
     return false
   }
+}
+
+private func accessTokenFromUrl(_ url: URL?) -> String? {
+  return url.flatMap { url in
+    URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+  }?
+    .first { item in item.name == "at" }?
+    .value
+}
+
+private func emailVerificationCompletionData(
+  event: Signal<EmailVerificationResponseEnvelope, ErrorEnvelope>.Event
+) -> (String, Bool)? {
+  guard !event.isCompleted else { return nil }
+
+  guard isNil(event.error), let message = event.value?.message else {
+    let message = event.error?.errorMessages.first ?? Strings.Something_went_wrong_please_try_again()
+
+    return (message, false)
+  }
+
+  return (message, true)
 }

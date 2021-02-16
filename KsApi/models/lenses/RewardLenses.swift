@@ -10,12 +10,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -29,12 +33,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -48,12 +56,16 @@ extension Reward {
         description: $0,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -67,12 +79,16 @@ extension Reward {
         description: $1.description,
         endsAt: $0,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -86,12 +102,39 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $0,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
+        startsAt: $1.startsAt,
+        title: $1.title
+      ) }
+    )
+
+    public static let hasAddOns = Lens<Reward, Bool>(
+      view: { $0.hasAddOns },
+      set: { Reward(
+        backersCount: $1.backersCount,
+        convertedMinimum: $1.convertedMinimum,
+        description: $1.description,
+        endsAt: $1.endsAt,
+        estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $0,
+        id: $1.id,
+        limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
+        minimum: $1.minimum,
+        remaining: $1.remaining,
+        rewardsItems: $1.rewardsItems,
+        shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -105,12 +148,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $0,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -124,12 +171,39 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $0,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
+        startsAt: $1.startsAt,
+        title: $1.title
+      ) }
+    )
+
+    public static let limitPerBacker = Lens<Reward, Int?>(
+      view: { $0.limitPerBacker },
+      set: { Reward(
+        backersCount: $1.backersCount,
+        convertedMinimum: $1.convertedMinimum,
+        description: $1.description,
+        endsAt: $1.endsAt,
+        estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
+        id: $1.id,
+        limit: $1.limit,
+        limitPerBacker: $0,
+        minimum: $1.minimum,
+        remaining: $1.remaining,
+        rewardsItems: $1.rewardsItems,
+        shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -143,12 +217,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $0,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -162,12 +240,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $0,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -181,12 +263,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $0,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -200,12 +286,62 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $0,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
+        startsAt: $1.startsAt,
+        title: $1.title
+      ) }
+    )
+
+    public static let shippingRules = Lens<Reward, [ShippingRule]?>(
+      view: { $0.shippingRules },
+      set: { Reward(
+        backersCount: $1.backersCount,
+        convertedMinimum: $1.convertedMinimum,
+        description: $1.description,
+        endsAt: $1.endsAt,
+        estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
+        id: $1.id,
+        limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
+        minimum: $1.minimum,
+        remaining: $1.remaining,
+        rewardsItems: $1.rewardsItems,
+        shipping: $1.shipping,
+        shippingRules: $0,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
+        startsAt: $1.startsAt,
+        title: $1.title
+      ) }
+    )
+
+    public static let shippingRulesExpanded = Lens<Reward, [ShippingRule]?>(
+      view: { $0.shippingRulesExpanded },
+      set: { Reward(
+        backersCount: $1.backersCount,
+        convertedMinimum: $1.convertedMinimum,
+        description: $1.description,
+        endsAt: $1.endsAt,
+        estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
+        id: $1.id,
+        limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
+        minimum: $1.minimum,
+        remaining: $1.remaining,
+        rewardsItems: $1.rewardsItems,
+        shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $0,
         startsAt: $1.startsAt,
         title: $1.title
       ) }
@@ -219,12 +355,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $0,
         title: $1.title
       ) }
@@ -238,12 +378,16 @@ extension Reward {
         description: $1.description,
         endsAt: $1.endsAt,
         estimatedDeliveryOn: $1.estimatedDeliveryOn,
+        hasAddOns: $1.hasAddOns,
         id: $1.id,
         limit: $1.limit,
+        limitPerBacker: $1.limitPerBacker,
         minimum: $1.minimum,
         remaining: $1.remaining,
         rewardsItems: $1.rewardsItems,
         shipping: $1.shipping,
+        shippingRules: $1.shippingRules,
+        shippingRulesExpanded: $1.shippingRulesExpanded,
         startsAt: $1.startsAt,
         title: $0
       ) }

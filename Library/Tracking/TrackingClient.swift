@@ -48,8 +48,7 @@ public final class TrackingClient: TrackingClientType {
   }
 
   public func track(event: String, properties: [String: Any]) {
-    if AppEnvironment.current.environmentVariables.isKoalaTrackingEnabled {
-      // swiftlint:disable:next line_length
+    if AppEnvironment.current.environmentVariables.isTrackingEnabled {
       print("\(self.config.identifier.emoji) [\(self.config.identifier) Track]: \(event), properties: \(properties)")
 
       self.queue.async {
@@ -140,7 +139,6 @@ public final class TrackingClient: TrackingClientType {
       defer { semaphore.signal() }
 
       if let httpResponse = response as? HTTPURLResponse {
-        // swiftlint:disable:next line_length
         print("\(self.config.identifier.emoji) [\(self.config.identifier) Status Code]: \(httpResponse.statusCode)")
 
         result = httpResponse

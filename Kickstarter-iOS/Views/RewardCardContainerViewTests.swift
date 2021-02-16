@@ -41,6 +41,36 @@ final class RewardCardContainerViewTests: TestCase {
     }
   }
 
+  func testLive_BackedProject_BackedReward_LoggedIn() {
+    let user = User.template
+
+    combos([Language.en], [Device.phone4_7inch], allRewards).forEach { language, device, rewardTuple in
+      withEnvironment(currentUser: user, language: language) {
+        let (rewardDescription, reward) = rewardTuple
+
+        let project = Project.cosmicSurgery
+          |> Project.lens.state .~ .live
+          |> Project.lens.personalization.isBacking .~ true
+          |> Project.lens.personalization.backing .~ (
+            .template
+              |> Backing.lens.reward .~ reward
+              |> Backing.lens.rewardId .~ reward.id
+              |> Backing.lens.shippingAmount .~ 10
+              |> Backing.lens.amount .~ 700.0
+          )
+
+        let vc = rewardCardInViewController(
+          language: language,
+          device: device,
+          project: project,
+          reward: reward
+        )
+
+        FBSnapshotVerifyView(vc.view, identifier: "\(rewardDescription)_lang_\(language)_device_\(device)")
+      }
+    }
+  }
+
   func testLive_BackedProject_NonBackedReward() {
     combos([Language.en], [Device.phone4_7inch], allRewards).forEach { language, device, rewardTuple in
       withEnvironment(language: language) {
@@ -313,58 +343,6 @@ final class RewardCardContainerViewTests: TestCase {
     }
   }
 
-  func testLive_NonBacker_NoReward_GoRewardlessFeature_IsOn() {
-    let mockConfig = Config.template
-      |> \.features .~ [Feature.goRewardless.rawValue: true]
-
-    combos([Language.en], [Device.phone4_7inch]).forEach { language, device in
-      withEnvironment(config: mockConfig) {
-        guard let noReward = allRewards.first(where: { $0.1.isNoReward }) else {
-          XCTFail("Should have a reward")
-          return
-        }
-        let (description, reward) = noReward
-
-        let vc = rewardCardInViewController(
-          language: language,
-          device: device,
-          project: Project.template,
-          reward: reward
-        )
-
-        FBSnapshotVerifyView(vc.view, identifier: "\(description)_lang_\(language)_device_\(device)")
-      }
-    }
-  }
-
-  func testLive_Backer_NoReward_GoRewardlessFeature_IsOn() {
-    let mockConfig = Config.template
-      |> \.features .~ [Feature.goRewardless.rawValue: true]
-
-    combos([Language.en], [Device.phone4_7inch]).forEach { language, device in
-      withEnvironment(config: mockConfig) {
-        guard let noReward = allRewards.first(where: { $0.1.isNoReward }) else {
-          XCTFail("Should have a reward")
-          return
-        }
-        let (description, reward) = noReward
-        let project = Project.template
-          |> Project.lens.personalization.isBacking .~ true
-          |> Project.lens.personalization.backing .~ (Backing.template
-            |> Backing.lens.reward .~ reward)
-
-        let vc = rewardCardInViewController(
-          language: language,
-          device: device,
-          project: project,
-          reward: reward
-        )
-
-        FBSnapshotVerifyView(vc.view, identifier: "\(description)_lang_\(language)_device_\(device)")
-      }
-    }
-  }
-
   override func tearDown() {
     AppEnvironment.popEnvironment()
     super.tearDown()
@@ -376,7 +354,6 @@ private func rewardCardInViewController(
 ) -> UIViewController {
   let view = RewardCardContainerView(frame: .zero)
     |> \.translatesAutoresizingMaskIntoConstraints .~ false
-  view.configure(with: (project: project, reward: .init(left: reward)))
 
   let controller = UIViewController(nibName: nil, bundle: nil)
   let (parent, _) = traitControllers(device: device, orientation: .portrait, child: controller)
@@ -392,12 +369,16 @@ private func rewardCardInViewController(
     view.bottomAnchor.constraint(lessThanOrEqualTo: controller.view.layoutMarginsGuide.bottomAnchor)
   ])
 
-  view.setNeedsLayout()
+  view.configure(with: (project: project, reward: reward, context: .pledge))
 
   return parent
 }
 
 let allRewards: [(String, Reward)] = {
+  let availableAddOnsReward = Reward.postcards
+    |> Reward.lens.hasAddOns .~ true
+    |> Reward.lens.limit .~ nil
+    |> Reward.lens.remaining .~ nil
   let availableLimitedReward = Reward.postcards
     |> Reward.lens.limit .~ 100
     |> Reward.lens.remaining .~ 25
@@ -457,6 +438,7 @@ let allRewards: [(String, Reward)] = {
     |> Reward.lens.convertedMinimum .~ 1
 
   return [
+    ("AvailableAddOnsReward", availableAddOnsReward),
     ("AvailableLimitedReward", availableLimitedReward),
     ("AvailableTimebasedReward", availableTimebasedReward),
     ("AvailableLimitedTimebasedReward", availableLimitedTimebasedReward),

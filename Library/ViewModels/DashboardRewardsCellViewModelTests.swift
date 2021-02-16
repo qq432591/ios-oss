@@ -81,7 +81,7 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
   func testRewards() {
     let rewards = [reward1, reward2, reward3]
     let project = .template
-      |> Project.lens.rewards .~ rewards
+      |> Project.lens.rewardData.rewards .~ rewards
       |> Project.lens.stats.pledged .~ 1_500
     let stats = [stat1, stat2]
 
@@ -93,7 +93,7 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
     self.vm.inputs.configureWith(rewardStats: stats, project: project)
 
     self.rewardsRowRewards.assertValues(
-      [[stat2, stat1, zeroPledgedStat1]],
+      [[self.stat2, self.stat1, self.zeroPledgedStat1]],
       "Emits initial reward stats sorted by minimum value"
     )
     self.rewardsRowCountry.assertValues([.us])
@@ -104,7 +104,7 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
   func testShowAllRewards() {
     let rewards = [reward1, reward2, reward3, reward4, reward5, reward6, reward7]
     let project = .template
-      |> Project.lens.rewards .~ rewards
+      |> Project.lens.rewardData.rewards .~ rewards
       |> Project.lens.stats.pledged .~ 5_000
     let stats = [stat1, stat2, stat3, stat4, stat5]
 
@@ -114,7 +114,7 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
     self.vm.inputs.configureWith(rewardStats: stats, project: project)
 
     self.rewardsRowRewards.assertValues(
-      [[stat4, stat5, stat2]],
+      [[self.stat4, self.stat5, self.stat2]],
       "Emits 4 initial rewards sorted by minimum value"
     )
 
@@ -126,19 +126,29 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
     self.vm.inputs.seeAllTiersButtonTapped()
 
     self.rewardsRowRewards.assertValues([
-      [stat4, stat5, stat2],
-      [stat4, stat5, stat2, stat1, stat3, zeroPledgedStat1, zeroPledgedStat2]
+      [self.stat4, self.stat5, self.stat2],
+      [
+        self.stat4,
+        self.stat5,
+        self.stat2,
+        self.stat1,
+        self.stat3,
+        self.zeroPledgedStat1,
+        self.zeroPledgedStat2
+      ]
     ], "Emit all rewards sorted by minimum value")
     self.rewardsRowCountry.assertValues([.us, .us])
     self.rewardsRowTotalPledged.assertValues([5_000, 5_000])
     self.hideSeeAllTiersButton.assertValues([false, true])
     self.notifyDelegateAddedRewardRows.assertValueCount(1, "Additional rewards were added.")
-    XCTAssertEqual(["Showed All Rewards"], self.trackingClient.events)
+
+    XCTAssertEqual([], self.dataLakeTrackingClient.events)
+    XCTAssertEqual([], self.segmentTrackingClient.events)
   }
 
   func testSorting() {
     let rewards = [reward1, reward2, reward3, reward4, reward5, reward6, reward7]
-    let project = Project.template |> Project.lens.rewards .~ rewards
+    let project = Project.template |> Project.lens.rewardData.rewards .~ rewards
     let stats = [stat1, stat2, stat3, stat4, stat5]
 
     self.rewardsRowRewards.assertValueCount(0)
@@ -147,15 +157,15 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
     self.vm.inputs.configureWith(rewardStats: stats, project: project)
 
     self.rewardsRowRewards.assertValues(
-      [[stat4, stat5, stat2]],
+      [[self.stat4, self.stat5, self.stat2]],
       "Emits 4 initial rewards sorted by minimum value"
     )
     self.vm.inputs.backersButtonTapped()
 
     self.rewardsRowRewards.assertValues(
       [
-        [stat4, stat5, stat2],
-        [stat2, stat1, stat4]
+        [self.stat4, self.stat5, self.stat2],
+        [self.stat2, self.stat1, self.stat4]
       ],
       "Emits rewards sorted by backers count"
     )
@@ -164,9 +174,9 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
 
     self.rewardsRowRewards.assertValues(
       [
-        [stat4, stat5, stat2],
-        [stat2, stat1, stat4],
-        [zeroPledgedStat2, stat4, stat5]
+        [self.stat4, self.stat5, self.stat2],
+        [self.stat2, self.stat1, self.stat4],
+        [self.zeroPledgedStat2, self.stat4, self.stat5]
       ],
       "Emits rewards sorted by min value"
     )
@@ -175,10 +185,10 @@ internal final class DashboardRewardsCellViewModelTests: TestCase {
 
     self.rewardsRowRewards.assertValues(
       [
-        [stat4, stat5, stat2],
-        [stat2, stat1, stat4],
-        [zeroPledgedStat2, stat4, stat5],
-        [stat4, stat5, stat2]
+        [self.stat4, self.stat5, self.stat2],
+        [self.stat2, self.stat1, self.stat4],
+        [self.zeroPledgedStat2, self.stat4, self.stat5],
+        [self.stat4, self.stat5, self.stat2]
       ],
       "Emits rewards sorted by pledged count"
     )

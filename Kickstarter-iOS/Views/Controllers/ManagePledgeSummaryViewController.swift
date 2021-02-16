@@ -40,8 +40,8 @@ final class ManagePledgeSummaryViewController: UIViewController {
 
   // MARK: - Lifecycle
 
-  public func configureWith(_ project: Project) {
-    self.viewModel.inputs.configureWith(project)
+  public func configureWith(_ data: ManagePledgeSummaryViewData) {
+    self.viewModel.inputs.configureWith(data)
   }
 
   override func viewDidLoad() {
@@ -62,7 +62,7 @@ final class ManagePledgeSummaryViewController: UIViewController {
       |> ignoresInvertColorsImageViewStyle
 
     _ = self.backerInfoContainerStackView
-      |> checkoutAdaptableStackViewStyle(
+      |> adaptableStackViewStyle(
         self.traitCollection.preferredContentSizeCategory.isAccessibilityCategory)
       |> backerInfoContainerStackViewStyle
 
@@ -76,7 +76,7 @@ final class ManagePledgeSummaryViewController: UIViewController {
       |> rootStackViewStyle
 
     _ = self.totalAmountStackView
-      |> checkoutAdaptableStackViewStyle(
+      |> adaptableStackViewStyle(
         self.traitCollection.preferredContentSizeCategory.isAccessibilityCategory
       )
 
@@ -98,10 +98,10 @@ final class ManagePledgeSummaryViewController: UIViewController {
   override func bindViewModel() {
     super.bindViewModel()
 
-    self.viewModel.outputs.configurePledgeAmountSummaryViewWithProject
+    self.viewModel.outputs.configurePledgeAmountSummaryViewWithData
       .observeForUI()
-      .observeValues { [weak self] project in
-        self?.pledgeAmountSummaryViewController.configureWith(project)
+      .observeValues { [weak self] data in
+        self?.pledgeAmountSummaryViewController.configureWith(data)
       }
 
     self.viewModel.outputs.configurePledgeStatusLabelViewWithProject
@@ -113,7 +113,7 @@ final class ManagePledgeSummaryViewController: UIViewController {
     self.viewModel.outputs.backerImageURLAndPlaceholderImageName
       .observeForUI()
       .on(event: { [weak self] _ in
-        self?.circleAvatarImageView.af_cancelImageRequest()
+        self?.circleAvatarImageView.af.cancelImageRequest()
         self?.circleAvatarImageView.image = nil
       })
       .observeValues { [weak self] url, placeholderImageName in
@@ -202,7 +202,7 @@ private let backerInfoStackViewStyle: StackViewStyle = { stackView in
 private let backerNumberLabelStyle: LabelStyle = { label in
   label
     |> checkoutLabelStyle
-    |> \.textColor .~ UIColor.ksr_soft_black
+    |> \.textColor .~ UIColor.ksr_support_700
     |> \.font .~ UIFont.ksr_footnote()
     |> \.adjustsFontForContentSizeCategory .~ true
 }
@@ -211,7 +211,7 @@ private let backingDateLabelStyle: LabelStyle = { label in
   label
     |> checkoutLabelStyle
     |> \.font .~ UIFont.ksr_footnote()
-    |> \.textColor .~ UIColor.ksr_dark_grey_500
+    |> \.textColor .~ UIColor.ksr_support_400
     |> \.adjustsFontForContentSizeCategory .~ true
     |> \.numberOfLines .~ 0
 }
@@ -225,8 +225,8 @@ private let rootStackViewStyle: StackViewStyle = { stackView in
 private let totalLabelStyle: LabelStyle = { label in
   label
     |> checkoutLabelStyle
-    |> \.textColor .~ UIColor.black
+    |> \.textColor .~ UIColor.ksr_black
     |> \.font .~ UIFont.ksr_subhead().bolded
     |> \.adjustsFontForContentSizeCategory .~ true
-    |> \.text %~ { _ in Strings.Total_amount() }
+    |> \.text %~ { _ in Strings.Total() }
 }

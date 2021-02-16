@@ -111,8 +111,8 @@ public final class TwoFactorViewModel: TwoFactorViewModelType, TwoFactorViewMode
     self.isLoading = isLoading.signal
 
     self.isFormValid = Signal.merge([
-      codeProperty.signal.map { code in code?.count == 6 },
-      viewWillAppearProperty.signal.mapConst(false)
+      self.codeProperty.signal.map { code in code?.count == 6 },
+      self.viewWillAppearProperty.signal.mapConst(false)
     ])
       .skipRepeats()
 
@@ -136,7 +136,7 @@ public final class TwoFactorViewModel: TwoFactorViewModelType, TwoFactorViewMode
       ))
 
     self.viewDidLoadProperty.signal
-      .observeValues { AppEnvironment.current.koala.track2FAViewed() }
+      .observeValues { AppEnvironment.current.ksrAnalytics.track2FAViewed() }
   }
 
   fileprivate let codeProperty = MutableProperty<String?>(nil)

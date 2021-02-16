@@ -27,12 +27,22 @@ internal final class LandingPageViewModelTests: TestCase {
     self.dismissViewController.assertValueCount(1)
   }
 
-  func testoptimizelyTracking_OnButtonTap() {
+  func testTrackingGetStartedButtonTapped() {
     XCTAssertEqual(self.optimizelyClient.trackedEventKey, nil)
 
     self.viewModel.inputs.ctaButtonTapped()
 
     XCTAssertEqual(self.optimizelyClient.trackedEventKey, "Get Started Button Clicked")
+    XCTAssertEqual(self.dataLakeTrackingClient.events, ["Onboarding Get Started Button Clicked"])
+    XCTAssertEqual(self.segmentTrackingClient.events, ["Onboarding Get Started Button Clicked"])
+    XCTAssertEqual(
+      self.dataLakeTrackingClient.properties(forKey: "context_page"),
+      ["landing_page"]
+    )
+    XCTAssertEqual(
+      self.segmentTrackingClient.properties(forKey: "context_page"),
+      ["landing_page"]
+    )
   }
 
   func testUserDefaultsUpdates_OnViewDidLoad() {

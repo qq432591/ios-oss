@@ -17,8 +17,9 @@ final class CancelPledgeViewController: UIViewController, MessageBannerViewContr
 
   // MARK: - Properties
 
-  private lazy var cancelPledgeButton = { UIButton(type: .custom)
-    |> \.translatesAutoresizingMaskIntoConstraints .~ false
+  private lazy var cancelPledgeButton: LoadingButton = {
+    LoadingButton(type: .custom)
+      |> \.translatesAutoresizingMaskIntoConstraints .~ false
   }()
 
   private lazy var cancellationDetailsTextLabel = { UILabel(frame: .zero) }()
@@ -99,8 +100,8 @@ final class CancelPledgeViewController: UIViewController, MessageBannerViewContr
 
   // MARK: - Configuration
 
-  internal func configure(with project: Project, backing: Backing) {
-    self.viewModel.inputs.configure(with: project, backing: backing)
+  internal func configure(with data: CancelPledgeViewData) {
+    self.viewModel.inputs.configure(with: data)
   }
 
   override func bindStyles() {
@@ -170,6 +171,12 @@ final class CancelPledgeViewController: UIViewController, MessageBannerViewContr
         self?.navigationController?.popViewController(animated: true)
       }
 
+    self.viewModel.outputs.isLoading
+      .observeForUI()
+      .observeValues { [weak self] isLoading in
+        self?.cancelPledgeButton.isLoading = isLoading
+      }
+
     self.cancellationDetailsTextLabel.rac.attributedText = self.viewModel.outputs
       .cancellationDetailsAttributedText
     self.cancelPledgeButton.rac.enabled = self.viewModel.outputs.cancelPledgeButtonEnabled
@@ -233,7 +240,7 @@ extension CancelPledgeViewController: UITextFieldDelegate {
 private let cancellationDisclaimerLabelStyle: LabelStyle = { label in
   label
     |> \.font .~ .ksr_caption1()
-    |> \.textColor .~ UIColor.ksr_text_navy_600
+    |> \.textColor .~ UIColor.ksr_support_400
     |> \.textAlignment .~ NSTextAlignment.center
     |> \.numberOfLines .~ 0
 }
@@ -241,7 +248,7 @@ private let cancellationDisclaimerLabelStyle: LabelStyle = { label in
 private let cancellationReasonTextFieldStyle: TextFieldStyle = { textField in
   textField
     |> formFieldStyle
-    |> \.backgroundColor .~ UIColor.white
+    |> \.backgroundColor .~ UIColor.ksr_white
     |> \.borderStyle .~ UITextField.BorderStyle.roundedRect
 }
 

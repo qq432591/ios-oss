@@ -1,10 +1,7 @@
 import AppCenter
-import AppCenterAnalytics
-import AppCenterCrashes
 import AppCenterDistribute
-import Crashlytics
-import Fabric
 import FBSDKCoreKit
+import Firebase
 import Foundation
 #if DEBUG
   @testable import KsApi
@@ -14,11 +11,12 @@ import Foundation
 import Kickstarter_Framework
 import Library
 import Optimizely
+import PerimeterX
 import Prelude
-import Qualtrics
 import ReactiveExtensions
 import ReactiveSwift
 import SafariServices
+import Segment
 import UIKit
 import UserNotifications
 
@@ -80,6 +78,18 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
         self?.viewModel.inputs.didUpdateConfig(config)
       }
 
+    self.viewModel.outputs.perimeterXInitialHeaders
+      .observeForUI()
+      .observeValues { pxHeaders in
+        print("❌ Perimeter X headers ready: \(String(describing: pxHeaders))")
+      }
+
+    self.viewModel.outputs.perimeterXRefreshedHeaders
+      .observeForUI()
+      .observeValues { pxHeaders in
+        print("❌ Perimeter X headers were refreshed: \(String(describing: pxHeaders))")
+      }
+
     self.viewModel.outputs.postNotification
       .observeForUI()
       .observeValues(NotificationCenter.default.post)
@@ -107,6 +117,16 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
       .observeForUI()
       .observeValues { [weak self] in
         self?.goToCreatorMessageThread($0, $1)
+      }
+
+    self.viewModel.outputs.goToLoginWithIntent
+      .observeForControllerAction()
+      .observeValues { [weak self] intent in
+        let vc = LoginToutViewController.configuredWith(loginIntent: intent)
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .formSheet
+
+        self?.rootTabBarController?.present(nav, animated: true, completion: nil)
       }
 
     self.viewModel.outputs.goToMessageThread
@@ -172,31 +192,27 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
     self.viewModel.outputs.configureAppCenterWithData
       .observeForUI()
       .observeValues { data in
-        let customProperties = MSCustomProperties()
-        customProperties.setString(data.userName, forKey: "userName")
+        let customProperties = CustomProperties()
+        customProperties.set(data.userName, forKey: "userName")
 
-        MSAppCenter.setUserId(data.userId)
-        MSAppCenter.setCustomProperties(customProperties)
+        AppCenter.userId = data.userId
+        AppCenter.setCustomProperties(customProperties)
 
-        MSCrashes.setDelegate(self)
-
-        MSAppCenter.start(
-          data.appSecret,
-          withServices: [
-            MSAnalytics.self,
-            MSCrashes.self,
-            MSDistribute.self
+        AppCenter.start(
+          withAppSecret: data.appSecret,
+          services: [
+            Distribute.self
           ]
         )
       }
 
     #if RELEASE || APPCENTER
-      self.viewModel.outputs.configureFabric
+      self.viewModel.outputs.configureFirebase
         .observeForUI()
         .observeValues {
-          Fabric.with([Crashlytics.self])
-          AppEnvironment.current.koala.logEventCallback = { event, _ in
-            CLSLogv("%@", getVaList([event]))
+          FirebaseApp.configure()
+          AppEnvironment.current.ksrAnalytics.logEventCallback = { event, _ in
+            Crashlytics.crashlytics().log(format: "%@", arguments: getVaList([event]))
           }
         }
     #endif
@@ -217,27 +233,6 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
       .observeForUI()
       .observeValues { [weak self] in self?.findRedirectUrl($0) }
 
-    self.viewModel.outputs.configureQualtrics
-      .observeValues { [weak self] config in
-        self?.configureQualtrics(with: config)
-      }
-
-    self.viewModel.outputs.evaluateQualtricsTargetingLogic
-      .observeValues { [weak self] in
-        Qualtrics.shared.evaluateTargetingLogic() { result in
-          self?.viewModel.inputs.didEvaluateQualtricsTargetingLogic(
-            with: result, properties: Qualtrics.shared.properties
-          )
-        }
-      }
-
-    self.viewModel.outputs.displayQualtricsSurvey
-      .observeForUI()
-      .observeValues { [weak self] in
-        guard let vc = self?.rootTabBarController else { return }
-        _ = Qualtrics.shared.display(viewController: vc)
-      }
-
     self.viewModel.outputs.goToCategoryPersonalizationOnboarding
       .observeForControllerAction()
       .observeValues { [weak self] in
@@ -249,7 +244,14 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
         self?.rootTabBarController?.present(navController, animated: true)
       }
 
-    // swiftlint:disable discarded_notification_center_observer
+    self.viewModel.outputs.emailVerificationCompleted
+      .observeForUI()
+      .observeValues { [weak self] message, success in
+        self?.rootTabBarController?.dismiss(animated: false, completion: nil)
+        self?.rootTabBarController?
+          .messageBannerViewController?.showBanner(with: success ? .success : .error, message: message)
+      }
+
     NotificationCenter.default
       .addObserver(forName: Notification.Name.ksr_sessionStarted, object: nil, queue: nil) { [weak self] _ in
         self?.viewModel.inputs.userSessionStarted()
@@ -266,14 +268,20 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
       .addObserver(forName: Notification.Name.ksr_sessionEnded, object: nil, queue: nil) { [weak self] _ in
         self?.viewModel.inputs.userSessionEnded()
       }
-    // swiftlint:enable discarded_notification_center_observer
 
-    self.window?.tintColor = .ksr_green_700
+    self.window?.tintColor = .ksr_create_700
 
     self.viewModel.inputs.applicationDidFinishLaunching(
       application: application,
       launchOptions: launchOptions
     )
+
+    // Perimeter X
+
+    if let pxManager = PXManager.sharedInstance() {
+      pxManager.delegate = self
+      pxManager.start(with: Secrets.perimeterxAppId)
+    }
 
     UNUserNotificationCenter.current().delegate = self
 
@@ -356,15 +364,24 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
       defaultLogLevel: logLevel.logLevel
     )
 
-    optimizelyClient.start { [weak self] result in
-      let shouldUpdateClient = self?.viewModel.inputs.optimizelyConfigured(with: result)
+    optimizelyClient.start(resourceTimeout: 3) { [weak self] result in
+      guard let self = self else { return }
 
-      if let shouldUpdateClient = shouldUpdateClient, shouldUpdateClient {
+      let optimizelyConfigurationError = self.viewModel.inputs.optimizelyConfigured(with: result)
+
+      guard let optimizelyError = optimizelyConfigurationError else {
         print("🔮 Optimizely SDK Successfully Configured")
         AppEnvironment.updateOptimizelyClient(optimizelyClient)
 
-        self?.viewModel.inputs.didUpdateOptimizelyClient(optimizelyClient)
+        self.viewModel.inputs.didUpdateOptimizelyClient(optimizelyClient)
+
+        return
       }
+
+      print("🔴 Optimizely SDK Configuration Failed with Error: \(optimizelyError.localizedDescription)")
+
+      Crashlytics.crashlytics().record(error: optimizelyError)
+      self.viewModel.inputs.optimizelyClientConfigurationFailed()
     }
   }
 
@@ -414,30 +431,6 @@ internal final class AppDelegate: UIResponder, UIApplicationDelegate {
     let task = session.dataTask(with: url)
     task.resume()
   }
-
-  // MARK: - Qualtrics Configuration
-
-  private func configureQualtrics(with config: QualtricsConfigData) {
-    config.stringProperties.forEach { key, value in
-      Qualtrics.shared.properties.setString(string: value, for: key)
-    }
-
-    Qualtrics.shared.initialize(
-      brandId: config.brandId,
-      zoneId: config.zoneId,
-      interceptId: config.interceptId
-    ) { result in
-      self.viewModel.inputs.qualtricsInitialized(with: result)
-    }
-  }
-}
-
-// MARK: - MSCrashesDelegate
-
-extension AppDelegate: MSCrashesDelegate {
-  func crashes(_: MSCrashes!, didSucceedSending _: MSErrorReport!) {
-    self.viewModel.inputs.crashManagerDidFinishSendingCrashReport()
-  }
 }
 
 // MARK: - URLSessionTaskDelegate
@@ -476,11 +469,20 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
       completion()
       return
     }
-
-    if !Qualtrics.shared.handleLocalNotification(response: response, displayOn: rootTabBarController) {
-      self.viewModel.inputs.didReceive(remoteNotification: response.notification.request.content.userInfo)
-      rootTabBarController.didReceiveBadgeValue(response.notification.request.content.badge as? Int)
-    }
+    self.viewModel.inputs.didReceive(remoteNotification: response.notification.request.content.userInfo)
+    rootTabBarController.didReceiveBadgeValue(response.notification.request.content.badge as? Int)
     completion()
+  }
+}
+
+// MARK: - PXManagerDelegate
+
+extension AppDelegate: PXManagerDelegate {
+  func managerReady(_ httpHeaders: [AnyHashable: Any]!) {
+    self.viewModel.inputs.perimeterXManagerReady(with: httpHeaders)
+  }
+
+  func newHeaders(_ httpHeaders: [AnyHashable: Any]!) {
+    self.viewModel.inputs.perimeterXNewHeaders(with: httpHeaders)
   }
 }

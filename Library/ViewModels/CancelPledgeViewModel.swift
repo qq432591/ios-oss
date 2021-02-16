@@ -3,9 +3,18 @@ import KsApi
 import Prelude
 import ReactiveSwift
 
+public struct CancelPledgeViewData {
+  public let project: Project // TODO: remove once tracking is updated.
+  public let projectCountry: Project.Country
+  public let projectName: String
+  public let omitUSCurrencyCode: Bool
+  public let backingId: String
+  public let pledgeAmount: Double
+}
+
 public protocol CancelPledgeViewModelInputs {
   func cancelPledgeButtonTapped()
-  func configure(with project: Project, backing: Backing)
+  func configure(with data: CancelPledgeViewData)
   func goBackButtonTapped()
   func textFieldDidEndEditing(with text: String?)
   func textFieldShouldReturn()
@@ -19,6 +28,7 @@ public protocol CancelPledgeViewModelOutputs {
   var cancelPledgeButtonEnabled: Signal<Bool, Never> { get }
   var cancelPledgeError: Signal<String, Never> { get }
   var dismissKeyboard: Signal<Void, Never> { get }
+  var isLoading: Signal<Bool, Never> { get }
   var notifyDelegateCancelPledgeSuccess: Signal<String, Never> { get }
   var popCancelPledgeViewController: Signal<Void, Never> { get }
 }
@@ -31,30 +41,23 @@ public protocol CancelPledgeViewModelType {
 public final class CancelPledgeViewModel: CancelPledgeViewModelType, CancelPledgeViewModelInputs,
   CancelPledgeViewModelOutputs {
   public init() {
-    let initialData = Signal.combineLatest(
-      self.configureWithProjectAndBackingProperty.signal.skipNil(),
+    let data = Signal.combineLatest(
+      self.configureWithDataProperty.signal.skipNil(),
       self.viewDidLoadProperty.signal
     )
     .map(first)
 
-    let project = initialData
-      .map(first)
-    let backing = initialData
-      .map(second)
-
-    let projectAndBacking = Signal.combineLatest(project, backing)
-
     self.cancellationDetailsAttributedText = Signal.merge(
-      initialData,
-      initialData.takeWhen(self.traitCollectionDidChangeProperty.signal)
+      data,
+      data.takeWhen(self.traitCollectionDidChangeProperty.signal)
     )
-    .map { project, backing in
+    .map { data in
       let formattedAmount = Format.currency(
-        backing.amount,
-        country: project.country,
-        omitCurrencyCode: project.stats.omitUSCurrencyCode
+        data.pledgeAmount,
+        country: data.projectCountry,
+        omitCurrencyCode: data.omitUSCurrencyCode
       )
-      return (formattedAmount, project.name)
+      return (formattedAmount, data.projectName)
     }
     .map(createCancellationDetailsAttributedText(with:projectName:))
 
@@ -71,7 +74,7 @@ public final class CancelPledgeViewModel: CancelPledgeViewModelType, CancelPledg
     )
 
     let cancelPledgeSubmit = Signal.combineLatest(
-      backing.map { $0.graphID },
+      data.map { $0.backingId },
       cancellationNote
     )
     .takeWhen(self.cancelPledgeButtonTappedProperty.signal)
@@ -84,6 +87,11 @@ public final class CancelPledgeViewModel: CancelPledgeViewModelType, CancelPledg
           .materialize()
       }
 
+    self.isLoading = Signal.merge(
+      self.cancelPledgeButtonTappedProperty.signal.mapConst(true),
+      cancelPledgeEvent.filter { $0.isTerminating }.mapConst(false)
+    )
+
     self.notifyDelegateCancelPledgeSuccess = cancelPledgeEvent.values()
       .map { _ in Strings.Youve_canceled_your_pledge() }
 
@@ -92,20 +100,11 @@ public final class CancelPledgeViewModel: CancelPledgeViewModelType, CancelPledg
       .map { $0.localizedDescription }
 
     self.cancelPledgeButtonEnabled = Signal.merge(
-      initialData.mapConst(true),
+      data.mapConst(true),
       cancelPledgeSubmit.mapConst(false),
       cancelPledgeEvent.map { $0.isTerminating }.mapConst(true)
     )
     .skipRepeats()
-
-    // Tracking
-    projectAndBacking
-      .takeWhen(self.cancelPledgeButtonTappedProperty.signal)
-      .observeValues { AppEnvironment.current.koala.trackCancelPledgeButtonClicked(
-        project: $0,
-        backing: $1
-      )
-      }
   }
 
   private let cancelPledgeButtonTappedProperty = MutableProperty(())
@@ -113,9 +112,9 @@ public final class CancelPledgeViewModel: CancelPledgeViewModelType, CancelPledg
     self.cancelPledgeButtonTappedProperty.value = ()
   }
 
-  private let configureWithProjectAndBackingProperty = MutableProperty<(Project, Backing)?>(nil)
-  public func configure(with project: Project, backing: Backing) {
-    self.configureWithProjectAndBackingProperty.value = (project, backing)
+  private let configureWithDataProperty = MutableProperty<CancelPledgeViewData?>(nil)
+  public func configure(with data: CancelPledgeViewData) {
+    self.configureWithDataProperty.value = data
   }
 
   private let goBackButtonTappedProperty = MutableProperty(())
@@ -152,6 +151,7 @@ public final class CancelPledgeViewModel: CancelPledgeViewModelType, CancelPledg
   public let cancelPledgeButtonEnabled: Signal<Bool, Never>
   public let cancelPledgeError: Signal<String, Never>
   public let dismissKeyboard: Signal<Void, Never>
+  public let isLoading: Signal<Bool, Never>
   public let notifyDelegateCancelPledgeSuccess: Signal<String, Never>
   public let popCancelPledgeViewController: Signal<Void, Never>
 

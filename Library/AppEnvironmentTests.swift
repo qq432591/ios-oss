@@ -114,7 +114,7 @@ final class AppEnvironmentTests: XCTestCase {
     XCTAssertEqual("mundo", env.apiService.serverConfig.basicHTTPAuth?.password)
     XCTAssertEqual("http://ksr.com", env.apiService.serverConfig.webBaseUrl.absoluteString)
     XCTAssertEqual(user, env.currentUser)
-    XCTAssertEqual(user, env.koala.loggedInUser)
+    XCTAssertEqual(user, env.ksrAnalytics.loggedInUser)
 
     let differentEnv = AppEnvironment.fromStorage(
       ubiquitousStore: MockKeyValueStore(),
@@ -135,7 +135,6 @@ final class AppEnvironmentTests: XCTestCase {
   }
 
   func testSaveEnvironment() {
-    // swiftlint:disable force_unwrapping
     let apiService = MockService(
       serverConfig: ServerConfig(
         apiBaseUrl: URL(string: "http://api.ksr.com")!,
@@ -146,7 +145,6 @@ final class AppEnvironmentTests: XCTestCase {
       ),
       oauthToken: OauthToken(token: "deadbeef")
     )
-    // swiftlint:enable force_unwrapping
     let currentUser = User.template
     let userDefaults = MockKeyValueStore()
     let ubiquitousStore = MockKeyValueStore()
@@ -157,7 +155,6 @@ final class AppEnvironmentTests: XCTestCase {
       userDefaults: userDefaults
     )
 
-    // swiftlint:disable:next force_unwrapping
     let result = userDefaults.dictionary(forKey: AppEnvironment.environmentStorageKey)!
 
     XCTAssertEqual("deadbeef", result["apiService.oauthToken.token"] as? String)
@@ -207,7 +204,7 @@ final class AppEnvironmentTests: XCTestCase {
     )
     XCTAssertEqual(EnvironmentType.production, env.apiService.serverConfig.environment)
     XCTAssertEqual(currentUser, env.currentUser)
-    XCTAssertEqual(currentUser, env.koala.loggedInUser)
+    XCTAssertEqual(currentUser, env.ksrAnalytics.loggedInUser)
   }
 
   func testPushPopSave() {

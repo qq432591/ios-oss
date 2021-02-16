@@ -1,11 +1,18 @@
 import UIKit
 
-// swiftlint:disable valid_docs
 extension UIFont {
   /// Returns a bolded version of `self`.
   public var bolded: UIFont {
     return self.fontDescriptor.withSymbolicTraits(.traitBold)
       .map { UIFont(descriptor: $0, size: 0.0) } ?? self
+  }
+
+  /// Returns a version of `self` with the desired weight.
+  public func weighted(_ weight: UIFont.Weight) -> UIFont {
+    let descriptor = self.fontDescriptor.addingAttributes([
+      .traits: [UIFontDescriptor.TraitKey.weight: weight]
+    ])
+    return UIFont(descriptor: descriptor, size: 0.0)
   }
 
   /// Returns a italicized version of `self`.
@@ -106,7 +113,6 @@ extension UIFont {
     return UIFont(descriptor: monospacedDescriptor, size: 0.0)
   }
 
-  // swiftlint:disable:next cyclomatic_complexity
   fileprivate static func preferredFont(style: UIFont.TextStyle, size: CGFloat? = nil) -> UIFont {
     let defaultSize: CGFloat
     switch style {

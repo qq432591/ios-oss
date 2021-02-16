@@ -13,7 +13,7 @@ internal final class UpdateViewController: WebViewController {
 
   @IBOutlet fileprivate var shareButton: UIBarButtonItem!
 
-  internal static func configuredWith(project: Project, update: Update, context _: Koala.UpdateContext)
+  internal static func configuredWith(project: Project, update: Update, context _: KSRAnalytics.UpdateContext)
     -> UpdateViewController {
     let vc = Storyboard.Update.instantiate(UpdateViewController.self)
     vc.viewModel.inputs.configureWith(project: project, update: update)
@@ -98,22 +98,13 @@ internal final class UpdateViewController: WebViewController {
 
   fileprivate func goTo(project: Project, refTag: RefTag) {
     let vc = ProjectNavigatorViewController.configuredWith(project: project, refTag: refTag)
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      vc.modalPresentationStyle = .fullScreen
+    }
     self.present(vc, animated: true, completion: nil)
   }
 
   fileprivate func showShareSheet(_ controller: UIActivityViewController) {
-    controller.completionWithItemsHandler = { [weak self] activityType, completed, returnedItems, error in
-
-      self?.shareViewModel.inputs.shareActivityCompletion(
-        with: .init(
-          activityType: activityType,
-          completed: completed,
-          returnedItems: returnedItems,
-          activityError: error
-        )
-      )
-    }
-
     if UIDevice.current.userInterfaceIdiom == .pad {
       controller.modalPresentationStyle = .popover
       let popover = controller.popoverPresentationController

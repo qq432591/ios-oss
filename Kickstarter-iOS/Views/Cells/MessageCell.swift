@@ -40,18 +40,18 @@ internal final class MessageCell: UITableViewCell, ValueCell {
       |> ignoresInvertColorsImageViewStyle
 
     _ = self.bodyTextView
-      |> UITextView.lens.textColor .~ .ksr_dark_grey_500
+      |> UITextView.lens.textColor .~ .ksr_support_400
       |> UITextView.lens.font .~ UIFont.ksr_subhead(size: 14.0)
 
     _ = self.dividerView
       |> separatorStyle
 
     _ = self.nameLabel
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
       |> UILabel.lens.font .~ UIFont.ksr_headline(size: 13.0)
 
     _ = self.timestampLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_400
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_caption1()
   }
 
@@ -64,12 +64,12 @@ internal final class MessageCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.avatarURL
       .observeForUI()
       .on(event: { [weak self] _ in
-        self?.avatarImageView.af_cancelImageRequest()
+        self?.avatarImageView.af.cancelImageRequest()
         self?.avatarImageView.image = nil
       })
       .skipNil()
       .observeValues { [weak self] in
-        self?.avatarImageView.af_setImage(withURL: $0)
+        self?.avatarImageView.af.setImage(withURL: $0)
       }
   }
 }

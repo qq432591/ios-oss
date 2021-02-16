@@ -23,10 +23,13 @@ import UIKit
     super.bindStyles()
 
     _ = self.blurView
-      |> UIImageView.lens.image .~ UIImage(named: "white--gradient--layer")
+      |> UIImageView.lens.image .~ Library.image(named: "white--gradient--layer")
 
     _ = self.categoryViewLabel
       |> postcardCategoryLabelStyle
+
+    _ = self.categoryViewImageView
+      |> \.tintColor .~ .ksr_support_300
   }
 
   internal override func bindViewModel() {
@@ -34,12 +37,12 @@ import UIKit
 
     self.categoryViewLabel.rac.text = self.viewModel.outputs.categoryNameText
 
-    self.viewModel.outputs.categoryImage.signal
+    self.viewModel.outputs.categoryImageName.signal
       .observeForUI()
-      .observeValues { [weak self] image in
+      .observeValues { [weak self] imageName in
         guard let strongSelf = self else { return }
         _ = strongSelf.categoryViewImageView
-          |> UIImageView.lens.image .~ image
+          |> UIImageView.lens.image .~ image(named: imageName)
       }
   }
 }

@@ -1,8 +1,6 @@
 @testable import Kickstarter_Framework
 @testable import KsApi
 @testable import Library
-// swiftlint:disable force_unwrapping
-// swiftlint:disable force_cast
 import Prelude
 import ReactiveExtensions
 import ReactiveExtensions_TestHelpers
@@ -18,11 +16,10 @@ final class AppDelegateViewModelTests: TestCase {
   private let configureOptimizelySDKKey = TestObserver<String, Never>()
   private let configureOptimizelyLogLevel = TestObserver<OptimizelyLogLevelType, Never>()
   private let configureOptimizelyDispatchInterval = TestObserver<TimeInterval, Never>()
-  private let configureFabric = TestObserver<(), Never>()
-  private let configureQualtrics = TestObserver<QualtricsConfigData, Never>()
+  private let configureFirebase = TestObserver<(), Never>()
   private let didAcceptReceivingRemoteNotifications = TestObserver<(), Never>()
-  private let displayQualtricsSurvey = TestObserver<(), Never>()
-  private let evaluateQualtricsTargetingLogic = TestObserver<(), Never>()
+  private let emailVerificationCompletedMessage = TestObserver<String, Never>()
+  private let emailVerificationCompletedSuccess = TestObserver<Bool, Never>()
   private let findRedirectUrl = TestObserver<URL, Never>()
   private let forceLogout = TestObserver<(), Never>()
   private let goToActivity = TestObserver<(), Never>()
@@ -31,10 +28,12 @@ final class AppDelegateViewModelTests: TestCase {
   private let goToDiscovery = TestObserver<DiscoveryParams?, Never>()
   private let goToLandingPage = TestObserver<(), Never>()
   private let goToProjectActivities = TestObserver<Param, Never>()
-  private let goToLogin = TestObserver<(), Never>()
+  private let goToLoginWithIntent = TestObserver<LoginIntent, Never>()
   private let goToProfile = TestObserver<(), Never>()
   private let goToMobileSafari = TestObserver<URL, Never>()
   private let goToSearch = TestObserver<(), Never>()
+  private let perimeterXManagerReady = TestObserver<[String: String]?, Never>()
+  private let perimeterXRefreshedHeaders = TestObserver<[String: String]?, Never>()
   private let postNotificationName = TestObserver<Notification.Name, Never>()
   private let presentViewController = TestObserver<Int, Never>()
   private let pushRegistrationStarted = TestObserver<(), Never>()
@@ -52,13 +51,14 @@ final class AppDelegateViewModelTests: TestCase {
 
     self.vm.outputs.applicationIconBadgeNumber.observe(self.applicationIconBadgeNumber.observer)
     self.vm.outputs.configureAppCenterWithData.observe(self.configureAppCenterWithData.observer)
-    self.vm.outputs.configureFabric.observe(self.configureFabric.observer)
+    self.vm.outputs.configureFirebase.observe(self.configureFirebase.observer)
     self.vm.outputs.configureOptimizely.map(first).observe(self.configureOptimizelySDKKey.observer)
     self.vm.outputs.configureOptimizely.map(second).observe(self.configureOptimizelyLogLevel.observer)
     self.vm.outputs.configureOptimizely.map(third).observe(self.configureOptimizelyDispatchInterval.observer)
-    self.vm.outputs.configureQualtrics.observe(self.configureQualtrics.observer)
-    self.vm.outputs.displayQualtricsSurvey.observe(self.displayQualtricsSurvey.observer)
-    self.vm.outputs.evaluateQualtricsTargetingLogic.observe(self.evaluateQualtricsTargetingLogic.observer)
+    self.vm.outputs.emailVerificationCompleted.map(first)
+      .observe(self.emailVerificationCompletedMessage.observer)
+    self.vm.outputs.emailVerificationCompleted.map(second)
+      .observe(self.emailVerificationCompletedSuccess.observer)
     self.vm.outputs.findRedirectUrl.observe(self.findRedirectUrl.observer)
     self.vm.outputs.forceLogout.observe(self.forceLogout.observer)
     self.vm.outputs.goToActivity.observe(self.goToActivity.observer)
@@ -67,11 +67,15 @@ final class AppDelegateViewModelTests: TestCase {
     self.vm.outputs.goToDashboard.observe(self.goToDashboard.observer)
     self.vm.outputs.goToDiscovery.observe(self.goToDiscovery.observer)
     self.vm.outputs.goToLandingPage.observe(self.goToLandingPage.observer)
-    self.vm.outputs.goToLogin.observe(self.goToLogin.observer)
+    self.vm.outputs.goToLoginWithIntent.observe(self.goToLoginWithIntent.observer)
     self.vm.outputs.goToProfile.observe(self.goToProfile.observer)
     self.vm.outputs.goToMobileSafari.observe(self.goToMobileSafari.observer)
     self.vm.outputs.goToProjectActivities.observe(self.goToProjectActivities.observer)
     self.vm.outputs.goToSearch.observe(self.goToSearch.observer)
+    self.vm.outputs.perimeterXInitialHeaders.map { $0 as? [String: String] }
+      .observe(self.perimeterXManagerReady.observer)
+    self.vm.outputs.perimeterXRefreshedHeaders.map { $0 as? [String: String] }
+      .observe(self.perimeterXRefreshedHeaders.observer)
     self.vm.outputs.postNotification.map { $0.name }.observe(self.postNotificationName.observer)
     self.vm.outputs.presentViewController.map { ($0 as! UINavigationController).viewControllers.count }
       .observe(self.presentViewController.observer)
@@ -132,10 +136,10 @@ final class AppDelegateViewModelTests: TestCase {
     }
   }
 
-  func testConfigureFabric() {
+  func testConfigureFirebase() {
     self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: nil)
 
-    self.configureFabric.assertValueCount(1)
+    self.configureFirebase.assertValueCount(1)
   }
 
   // MARK: - Optimizely
@@ -234,9 +238,13 @@ final class AppDelegateViewModelTests: TestCase {
       self.configureOptimizelySDKKey
         .assertValues([Secrets.OptimizelySDKKey.staging])
 
-      let shouldUpdateClient = self.vm.inputs.optimizelyConfigured(with: MockOptimizelyResult())
+      let error = self.vm.inputs.optimizelyConfigured(with: MockOptimizelyResult())
 
-      XCTAssertTrue(shouldUpdateClient)
+      XCTAssertNil(error)
+
+      self.vm.inputs.didUpdateOptimizelyClient(MockOptimizelyClient())
+
+      self.postNotificationName.assertValues([.ksr_optimizelyClientConfigured])
     }
   }
 
@@ -250,18 +258,14 @@ final class AppDelegateViewModelTests: TestCase {
       self.configureOptimizelySDKKey
         .assertValues([Secrets.OptimizelySDKKey.staging])
 
-      let shouldUpdateClient = self.vm.inputs.optimizelyConfigured(with: mockResult)
+      let error = self.vm.inputs.optimizelyConfigured(with: mockResult) as? MockOptimizelyError
 
-      XCTAssertFalse(shouldUpdateClient)
+      XCTAssertEqual("Optimizely Error", error?.localizedDescription)
+
+      self.vm.inputs.optimizelyClientConfigurationFailed()
+
+      self.postNotificationName.assertValues([.ksr_optimizelyClientConfigurationFailed])
     }
-  }
-
-  func testOptimizelyTracking() {
-    XCTAssertEqual(self.optimizelyClient.trackedEventKey, nil)
-
-    self.vm.inputs.applicationDidEnterBackground()
-
-    XCTAssertEqual(self.optimizelyClient.trackedEventKey, "App Closed")
   }
 
   // MARK: - AppCenter
@@ -409,51 +413,6 @@ final class AppDelegateViewModelTests: TestCase {
     }
   }
 
-  func testKoala_AppLifecycle() {
-    XCTAssertEqual([], trackingClient.events)
-
-    self.vm.inputs.applicationDidFinishLaunching(
-      application: UIApplication.shared,
-      launchOptions: [:]
-    )
-    XCTAssertEqual(["App Open", "Opened App"], trackingClient.events)
-
-    self.vm.inputs.applicationDidEnterBackground()
-    XCTAssertEqual(["App Open", "Opened App", "App Close", "Closed App"], trackingClient.events)
-
-    self.vm.inputs.applicationWillEnterForeground()
-    XCTAssertEqual(
-      ["App Open", "Opened App", "App Close", "Closed App", "App Open", "Opened App"],
-      trackingClient.events
-    )
-  }
-
-  func testKoala_MemoryWarning() {
-    XCTAssertEqual([], trackingClient.events)
-
-    self.vm.inputs.applicationDidFinishLaunching(
-      application: UIApplication.shared,
-      launchOptions: [:]
-    )
-    XCTAssertEqual(["App Open", "Opened App"], trackingClient.events)
-
-    self.vm.inputs.applicationDidReceiveMemoryWarning()
-    XCTAssertEqual(["App Open", "Opened App", "App Memory Warning"], trackingClient.events)
-  }
-
-  func testKoala_AppCrash() {
-    XCTAssertEqual([], trackingClient.events)
-
-    self.vm.inputs.applicationDidFinishLaunching(
-      application: UIApplication.shared,
-      launchOptions: [:]
-    )
-    XCTAssertEqual(["App Open", "Opened App"], trackingClient.events)
-
-    self.vm.inputs.crashManagerDidFinishSendingCrashReport()
-    XCTAssertEqual(["App Open", "Opened App", "Crashed App"], trackingClient.events)
-  }
-
   func testCurrentUserUpdating_NothingHappensWhenLoggedOut() {
     self.vm.inputs.applicationDidFinishLaunching(
       application: UIApplication.shared,
@@ -542,35 +501,6 @@ final class AppDelegateViewModelTests: TestCase {
     }
   }
 
-  func testOpenAppBanner() {
-    self.vm.inputs.applicationDidFinishLaunching(
-      application: UIApplication.shared,
-      launchOptions: [:]
-    )
-
-    XCTAssertEqual(["App Open", "Opened App"], self.trackingClient.events)
-
-    let result = self.vm.inputs.applicationOpenUrl(
-      application: UIApplication.shared,
-      url: URL(string: "http://www.google.com/?app_banner=1&hello=world")!,
-      options: [:]
-    )
-    XCTAssertTrue(result)
-
-    XCTAssertEqual(
-      ["App Open", "Opened App", "Smart App Banner Opened", "Opened App Banner"],
-      self.trackingClient.events
-    )
-    XCTAssertEqual(
-      [true, nil, true, nil],
-      self.trackingClient.properties(forKey: Koala.DeprecatedKey, as: Bool.self)
-    )
-    XCTAssertEqual(
-      [nil, nil, "world", "world"],
-      self.trackingClient.properties(forKey: "hello", as: String.self)
-    )
-  }
-
   func testConfig() {
     let config1 = Config.template |> Config.lens.countryCode .~ "US"
     withEnvironment(apiService: MockService(fetchConfigResponse: config1)) {
@@ -614,6 +544,32 @@ final class AppDelegateViewModelTests: TestCase {
         .ksr_configUpdated,
         .ksr_configUpdated
       ])
+    }
+  }
+
+  // MARK: - Perimeter X
+
+  func testPerimeterXManagerReady() {
+    let mockService = MockService(serverConfig: ServerConfig.staging)
+
+    withEnvironment(apiService: mockService) {
+      self.perimeterXManagerReady.assertDidNotEmitValue()
+
+      self.vm.inputs.perimeterXManagerReady(with: ["foo": "bar"])
+
+      self.perimeterXManagerReady.assertValue(["foo": "bar"])
+    }
+  }
+
+  func testPerimeterXNewHeaders() {
+    let mockService = MockService(serverConfig: ServerConfig.staging)
+
+    withEnvironment(apiService: mockService) {
+      self.perimeterXRefreshedHeaders.assertDidNotEmitValue()
+
+      self.vm.inputs.perimeterXNewHeaders(with: ["foo": "bar"])
+
+      self.perimeterXRefreshedHeaders.assertValue(["foo": "bar"])
     }
   }
 
@@ -868,7 +824,7 @@ final class AppDelegateViewModelTests: TestCase {
       launchOptions: [:]
     )
 
-    self.goToLogin.assertValueCount(0)
+    self.goToLoginWithIntent.assertValueCount(0)
 
     let result = self.vm.inputs.applicationOpenUrl(
       application: UIApplication.shared,
@@ -877,7 +833,7 @@ final class AppDelegateViewModelTests: TestCase {
     )
     XCTAssertTrue(result)
 
-    self.goToLogin.assertValueCount(1)
+    self.goToLoginWithIntent.assertValueCount(1)
   }
 
   func testGoToProfile() {
@@ -942,7 +898,8 @@ final class AppDelegateViewModelTests: TestCase {
   }
 
   func testRegisterPushNotifications_Prompted() {
-    let client = MockTrackingClient()
+    let dataLakeClient = MockTrackingClient()
+    let segmentClient = MockTrackingClient()
 
     MockPushRegistration.hasAuthorizedNotificationsProducer = .init(value: false)
     MockPushRegistration.registerProducer = .init(value: true)
@@ -950,10 +907,10 @@ final class AppDelegateViewModelTests: TestCase {
     withEnvironment(
       apiService: MockService(),
       currentUser: .template,
-      koala: Koala(client: client),
+      ksrAnalytics: KSRAnalytics(dataLakeClient: dataLakeClient, segmentClient: segmentClient),
       pushRegistrationType: MockPushRegistration.self
     ) {
-      XCTAssertEqual([], client.events)
+      XCTAssertEqual([], dataLakeClient.events)
       self.pushRegistrationStarted.assertValueCount(0)
       self.pushTokenSuccessfullyRegistered.assertValueCount(0)
 
@@ -969,14 +926,14 @@ final class AppDelegateViewModelTests: TestCase {
 
       self.pushTokenSuccessfullyRegistered.assertValueCount(1)
 
-      XCTAssertEqual(
-        ["App Open", "Opened App", "Confirmed Push Opt-In"], client.events
-      )
+      XCTAssertEqual([], dataLakeClient.events)
+      XCTAssertEqual([], segmentClient.events)
     }
   }
 
   func testRegisterPushNotifications_PreviouslyAccepted() {
-    let client = MockTrackingClient()
+    let dataLakeClient = MockTrackingClient()
+    let segmentClient = MockTrackingClient()
 
     MockPushRegistration.hasAuthorizedNotificationsProducer = .init(value: true)
     MockPushRegistration.registerProducer = .init(value: true)
@@ -984,10 +941,10 @@ final class AppDelegateViewModelTests: TestCase {
     withEnvironment(
       apiService: MockService(),
       currentUser: .template,
-      koala: Koala(client: client),
+      ksrAnalytics: KSRAnalytics(dataLakeClient: dataLakeClient, segmentClient: segmentClient),
       pushRegistrationType: MockPushRegistration.self
     ) {
-      XCTAssertEqual([], client.events)
+      XCTAssertEqual([], dataLakeClient.events)
       self.pushRegistrationStarted.assertValueCount(0)
       self.pushTokenSuccessfullyRegistered.assertValueCount(0)
 
@@ -1002,50 +959,30 @@ final class AppDelegateViewModelTests: TestCase {
 
       self.pushTokenSuccessfullyRegistered.assertValueCount(1)
 
-      XCTAssertEqual(
-        ["App Open", "Opened App"], client.events,
-        "Re-registers for pushes but does not track as an opt-in"
-      )
+      XCTAssertEqual([], dataLakeClient.events)
+      XCTAssertEqual([], segmentClient.events)
     }
   }
 
   func testTrackingPushAuthorizationOptIn() {
-    let client = MockTrackingClient()
+    let dataLakeClient = MockTrackingClient()
+    let segmentClient = MockTrackingClient()
 
     MockPushRegistration.hasAuthorizedNotificationsProducer = .init(value: false)
     MockPushRegistration.registerProducer = .init(value: true)
 
     withEnvironment(
-      currentUser: .template, koala: Koala(client: client), pushRegistrationType: MockPushRegistration.self
+      currentUser: .template,
+      ksrAnalytics: KSRAnalytics(dataLakeClient: dataLakeClient, segmentClient: segmentClient),
+      pushRegistrationType: MockPushRegistration.self
     ) {
-      XCTAssertEqual([], client.events)
+      XCTAssertEqual([], dataLakeClient.events)
+      XCTAssertEqual([], segmentClient.events)
 
       self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: [:])
       self.vm.inputs.userSessionStarted()
 
       self.vm.inputs.didAcceptReceivingRemoteNotifications()
-
-      XCTAssertEqual(["App Open", "Opened App", "Confirmed Push Opt-In"], client.events)
-    }
-  }
-
-  func testTrackingPushAuthorizationOptOut() {
-    let client = MockTrackingClient()
-
-    MockPushRegistration.hasAuthorizedNotificationsProducer = .init(value: false)
-    MockPushRegistration.registerProducer = .init(value: false)
-
-    withEnvironment(
-      currentUser: .template, koala: Koala(client: client), pushRegistrationType: MockPushRegistration.self
-    ) {
-      XCTAssertEqual([], client.events)
-
-      self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: [:])
-      self.vm.inputs.userSessionStarted()
-
-      self.vm.inputs.didAcceptReceivingRemoteNotifications()
-
-      XCTAssertEqual(["App Open", "Opened App", "Dismissed Push Opt-In"], client.events)
     }
   }
 
@@ -1073,14 +1010,6 @@ final class AppDelegateViewModelTests: TestCase {
     self.vm.inputs.didReceive(remoteNotification: friendBackingPushData)
 
     self.presentViewController.assertValueCount(1)
-    XCTAssertEqual(
-      ["App Open", "Opened App", "Notification Opened", "Opened Notification"],
-      self.trackingClient.events
-    )
-    XCTAssertEqual(
-      [true, nil, true, nil],
-      self.trackingClient.properties(forKey: Koala.DeprecatedKey, as: Bool.self)
-    )
   }
 
   func testOpenNotification_NewBacking_ForCreator() {
@@ -1281,21 +1210,12 @@ final class AppDelegateViewModelTests: TestCase {
 
     self.goToActivity.assertValueCount(0)
     XCTAssertFalse(self.vm.outputs.continueUserActivityReturnValue.value)
-    XCTAssertEqual(["App Open", "Opened App"], self.trackingClient.events)
 
     let result = self.vm.inputs.applicationContinueUserActivity(userActivity)
     XCTAssertTrue(result)
 
     self.goToActivity.assertValueCount(1)
     XCTAssertTrue(self.vm.outputs.continueUserActivityReturnValue.value)
-    XCTAssertEqual(
-      ["App Open", "Opened App", "Continue User Activity", "Opened Deep Link"],
-      self.trackingClient.events
-    )
-    XCTAssertEqual(
-      [true, nil, true, nil],
-      self.trackingClient.properties(forKey: Koala.DeprecatedKey, as: Bool.self)
-    )
   }
 
   func testContinueUserActivity_InvalidActivity() {
@@ -1306,7 +1226,6 @@ final class AppDelegateViewModelTests: TestCase {
     XCTAssertFalse(result)
 
     XCTAssertFalse(self.vm.outputs.continueUserActivityReturnValue.value)
-    XCTAssertEqual(["App Open", "Opened App"], self.trackingClient.events)
   }
 
   func testContinueUserActivity_WhenOnboardingFlowIsActive() {
@@ -1548,86 +1467,6 @@ final class AppDelegateViewModelTests: TestCase {
       self.goToSearch.assertValueCount(0)
       XCTAssertFalse(self.vm.outputs.applicationDidFinishLaunchingReturnValue)
     }
-  }
-
-  func testPerformShortcutItem_KoalaTracking() {
-    // Launch app and wait for shortcuts to be set
-    self.vm.inputs.applicationDidFinishLaunching(
-      application: UIApplication.shared,
-      launchOptions: [:]
-    )
-    self.scheduler.advance(by: .seconds(5))
-
-    // Perform a shortcut item
-    self.vm.inputs.applicationPerformActionForShortcutItem(
-      ShortcutItem.projectsWeLove.applicationShortcutItem
-    )
-
-    XCTAssertEqual(["App Open", "Opened App", "Performed Shortcut"], self.trackingClient.events)
-    XCTAssertEqual(
-      [nil, nil, "projects_we_love"],
-      self.trackingClient.properties(forKey: "type", as: String.self)
-    )
-    XCTAssertEqual(
-      [nil, nil, "projects_we_love,search"],
-      self.trackingClient.properties(forKey: "context", as: String.self)
-    )
-
-    withEnvironment(currentUser: .template) {
-      // Login with a user and wait for shortcuts to be set
-      self.vm.inputs.userSessionStarted()
-      self.scheduler.advance(by: .seconds(5))
-
-      XCTAssertEqual(
-        ["App Open", "Opened App", "Performed Shortcut"],
-        self.trackingClient.events,
-        "Nothing new is tracked."
-      )
-
-      // Perform shortcut item
-      self.vm.inputs.applicationPerformActionForShortcutItem(
-        ShortcutItem.recommendedForYou.applicationShortcutItem
-      )
-
-      XCTAssertEqual(
-        ["App Open", "Opened App", "Performed Shortcut", "Performed Shortcut"],
-        self.trackingClient.events
-      )
-      XCTAssertEqual(
-        [nil, nil, "projects_we_love", "recommended_for_you"],
-        self.trackingClient.properties(forKey: "type", as: String.self)
-      )
-      XCTAssertEqual(
-        [
-          nil, nil, "projects_we_love,search",
-          "recommended_for_you,projects_we_love,search"
-        ],
-        self.trackingClient.properties(forKey: "context", as: String.self)
-      )
-    }
-  }
-
-  func testLaunchShortcutItem_KoalaTracking() {
-    self.vm.inputs.applicationDidFinishLaunching(
-      application: UIApplication.shared,
-      launchOptions: [
-        UIApplication.LaunchOptionsKey.shortcutItem: ShortcutItem.projectsWeLove.applicationShortcutItem
-      ]
-    )
-
-    XCTAssertEqual(["App Open", "Opened App"], self.trackingClient.events)
-
-    self.scheduler.advance(by: .seconds(5))
-
-    XCTAssertEqual(["App Open", "Opened App", "Performed Shortcut"], self.trackingClient.events)
-    XCTAssertEqual(
-      [nil, nil, "projects_we_love"],
-      self.trackingClient.properties(forKey: "type", as: String.self)
-    )
-    XCTAssertEqual(
-      [nil, nil, "projects_we_love,search"],
-      self.trackingClient.properties(forKey: "context", as: String.self)
-    )
   }
 
   func testVisitorCookies_ApplicationDidFinishLaunching() {
@@ -2004,6 +1843,108 @@ final class AppDelegateViewModelTests: TestCase {
     self.presentViewController.assertValues([1])
   }
 
+  func testErroredPledgeDeepLink_LoggedIn() {
+    let project = Project.template
+      |> \.personalization.backing .~ .template
+    let service = MockService(fetchProjectResponse: project)
+
+    withEnvironment(apiService: service, currentUser: .template) {
+      self.vm.inputs.applicationDidFinishLaunching(
+        application: UIApplication.shared,
+        launchOptions: [:]
+      )
+
+      self.goToLoginWithIntent.assertDidNotEmitValue()
+      self.presentViewController.assertValues([])
+
+      let projectUrl = "https://www.kickstarter.com"
+        + "/projects/sshults/greensens-the-easy-way-to-take-care-of-your-houseplants-0"
+        + "/pledge?at=4f7d35e7c9d2bb57&ref=ksr_email_backer_failed_transaction"
+
+      let result = self.vm.inputs.applicationOpenUrl(
+        application: UIApplication.shared,
+        url: URL(string: projectUrl)!,
+        options: [:]
+      )
+      XCTAssertTrue(result)
+
+      self.goToLoginWithIntent.assertDidNotEmitValue()
+      self.presentViewController.assertValues([2])
+    }
+  }
+
+  func testErroredPledgeDeepLink_LoggedOut() {
+    withEnvironment(currentUser: nil) {
+      self.vm.inputs.applicationDidFinishLaunching(
+        application: UIApplication.shared,
+        launchOptions: [:]
+      )
+
+      self.goToLoginWithIntent.assertDidNotEmitValue()
+      self.presentViewController.assertValues([])
+
+      let projectUrl = "https://www.kickstarter.com"
+        + "/projects/sshults/greensens-the-easy-way-to-take-care-of-your-houseplants-0"
+        + "/pledge?at=4f7d35e7c9d2bb57&ref=ksr_email_backer_failed_transaction"
+
+      let result = self.vm.inputs.applicationOpenUrl(
+        application: UIApplication.shared,
+        url: URL(string: projectUrl)!,
+        options: [:]
+      )
+      XCTAssertTrue(result)
+
+      self.goToLoginWithIntent.assertValues([.erroredPledge])
+      self.presentViewController.assertDidNotEmitValue()
+    }
+  }
+
+  func testErroredPledgePushDeepLink_LoggedIn() {
+    let project = Project.template
+      |> \.personalization.backing .~ .template
+    let service = MockService(fetchProjectResponse: project)
+
+    withEnvironment(apiService: service, currentUser: .template) {
+      self.goToLoginWithIntent.assertDidNotEmitValue()
+      self.presentViewController.assertDidNotEmitValue()
+
+      let pushData: [String: Any] = [
+        "aps": [
+          "alert": "You have an errored pledge."
+        ],
+        "errored_pledge": [
+          "project_id": 2
+        ]
+      ]
+
+      self.vm.inputs.didReceive(remoteNotification: pushData)
+
+      self.goToLoginWithIntent.assertDidNotEmitValue()
+      self.presentViewController.assertValues([2])
+    }
+  }
+
+  func testErroredPledgePushDeepLink_LoggedOut() {
+    withEnvironment(currentUser: nil) {
+      self.goToLoginWithIntent.assertDidNotEmitValue()
+      self.presentViewController.assertDidNotEmitValue()
+
+      let pushData: [String: Any] = [
+        "aps": [
+          "alert": "You have an errored pledge."
+        ],
+        "errored_pledge": [
+          "project_id": 2
+        ]
+      ]
+
+      self.vm.inputs.didReceive(remoteNotification: pushData)
+
+      self.goToLoginWithIntent.assertValues([.erroredPledge])
+      self.presentViewController.assertDidNotEmitValue()
+    }
+  }
+
   func testUserSurveyDeepLink() {
     self.vm.inputs.applicationDidFinishLaunching(
       application: UIApplication.shared,
@@ -2203,237 +2144,6 @@ final class AppDelegateViewModelTests: TestCase {
       self.vm.inputs.showNotificationDialog(notification: notification)
 
       self.showAlert.assertDidNotEmitValue()
-    }
-  }
-
-  // MARK: - Qualtrics
-
-  private let firstAppSessionKey = "first_app_session"
-
-  func testQualtricsDisplaySurvey_FeatureFlagDisabled() {
-    let config = Config.template
-      |> \.features .~ [Feature.qualtrics.rawValue: false]
-
-    withEnvironment(config: config) {
-      self.configureQualtrics.assertDidNotEmitValue()
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-
-      self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: nil)
-      self.vm.inputs.didUpdateConfig(config)
-
-      self.configureQualtrics.assertDidNotEmitValue()
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-    }
-  }
-
-  func testQualtricsDisplaySurvey_Success_LoggedOut() {
-    let config = Config.template
-      |> \.features .~ [Feature.qualtrics.rawValue: true]
-
-    let mockQualtricsPropertiesType = MockQualtricsPropertiesType()
-
-    withEnvironment(config: config) {
-      self.configureQualtrics.assertDidNotEmitValue()
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: nil)
-      self.vm.inputs.didUpdateConfig(config)
-
-      let expectedConfig = QualtricsConfigData(
-        brandId: Secrets.Qualtrics.brandId,
-        zoneId: Secrets.Qualtrics.zoneId,
-        interceptId: QualtricsIntercept.survey.interceptId,
-        stringProperties: qualtricsProps()
-          .withAllValuesFrom([
-            "logged_in": "false"
-          ])
-      )
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.qualtricsInitialized(with: MockQualtricsResultType(passedResult: true))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.scheduler.advance(by: .seconds(2))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertValueCount(1)
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.didEvaluateQualtricsTargetingLogic(
-        with: MockQualtricsResultType(passedResult: true),
-        properties: mockQualtricsPropertiesType
-      )
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertValueCount(1)
-      self.evaluateQualtricsTargetingLogic.assertValueCount(1)
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], 0)
-    }
-  }
-
-  func testQualtricsDisplaySurvey_Success_LoggedIn() {
-    let config = Config.template
-      |> \.features .~ [Feature.qualtrics.rawValue: true]
-
-    let mockQualtricsPropertiesType = MockQualtricsPropertiesType()
-
-    withEnvironment(config: config, currentUser: .template) {
-      self.configureQualtrics.assertDidNotEmitValue()
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: nil)
-      self.vm.inputs.didUpdateConfig(config)
-
-      let expectedConfig = QualtricsConfigData(
-        brandId: Secrets.Qualtrics.brandId,
-        zoneId: Secrets.Qualtrics.zoneId,
-        interceptId: QualtricsIntercept.survey.interceptId,
-        stringProperties: qualtricsProps()
-          .withAllValuesFrom([
-            "logged_in": "true",
-            "user_uid": "1"
-          ])
-      )
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.qualtricsInitialized(with: MockQualtricsResultType(passedResult: true))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.scheduler.advance(by: .seconds(2))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertValueCount(1)
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.didEvaluateQualtricsTargetingLogic(
-        with: MockQualtricsResultType(passedResult: true),
-        properties: mockQualtricsPropertiesType
-      )
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertValueCount(1)
-      self.evaluateQualtricsTargetingLogic.assertValueCount(1)
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], 0)
-    }
-  }
-
-  func testQualtricsDisplaySurvey_FailureToConfigure_LoggedIn() {
-    let config = Config.template
-      |> \.features .~ [Feature.qualtrics.rawValue: true]
-
-    let mockQualtricsPropertiesType = MockQualtricsPropertiesType()
-
-    withEnvironment(config: config, currentUser: .template) {
-      self.configureQualtrics.assertDidNotEmitValue()
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: nil)
-      self.vm.inputs.didUpdateConfig(config)
-
-      let expectedConfig = QualtricsConfigData(
-        brandId: Secrets.Qualtrics.brandId,
-        zoneId: Secrets.Qualtrics.zoneId,
-        interceptId: QualtricsIntercept.survey.interceptId,
-        stringProperties: qualtricsProps()
-      )
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.qualtricsInitialized(with: MockQualtricsResultType(passedResult: false))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.scheduler.advance(by: .seconds(2))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-    }
-  }
-
-  func testQualtricsDisplaySurvey_DidNotPassTargetingLogic_LoggedIn() {
-    let config = Config.template
-      |> \.features .~ [Feature.qualtrics.rawValue: true]
-
-    let mockQualtricsPropertiesType = MockQualtricsPropertiesType()
-
-    withEnvironment(config: config, currentUser: .template) {
-      self.configureQualtrics.assertDidNotEmitValue()
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.applicationDidFinishLaunching(application: UIApplication.shared, launchOptions: nil)
-      self.vm.inputs.didUpdateConfig(config)
-
-      let expectedConfig = QualtricsConfigData(
-        brandId: Secrets.Qualtrics.brandId,
-        zoneId: Secrets.Qualtrics.zoneId,
-        interceptId: QualtricsIntercept.survey.interceptId,
-        stringProperties: qualtricsProps()
-      )
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.qualtricsInitialized(with: MockQualtricsResultType(passedResult: true))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertDidNotEmitValue()
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.scheduler.advance(by: .seconds(2))
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertValueCount(1)
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], nil)
-
-      self.vm.inputs.didEvaluateQualtricsTargetingLogic(
-        with: MockQualtricsResultType(passedResult: false),
-        properties: mockQualtricsPropertiesType
-      )
-
-      self.configureQualtrics.assertValues([expectedConfig])
-      self.displayQualtricsSurvey.assertDidNotEmitValue()
-      self.evaluateQualtricsTargetingLogic.assertValueCount(1)
-      XCTAssertEqual(mockQualtricsPropertiesType.values[firstAppSessionKey], 0)
     }
   }
 
@@ -2652,17 +2362,105 @@ final class AppDelegateViewModelTests: TestCase {
       self.goToLandingPage.assertValueCount(1)
     }
   }
-}
 
-private func qualtricsProps() -> [String: String] {
-  return [
-    "bundle_id": AppEnvironment.current.mainBundle.bundleIdentifier,
-    "language": AppEnvironment.current.language.rawValue,
-    "logged_in": "true",
-    "distinct_id": AppEnvironment.current.device.identifierForVendor?.uuidString,
-    "user_uid": AppEnvironment.current.currentUser.flatMap { $0.id }.map(String.init)
-  ]
-  .compact()
+  func testVerifyEmail_Success() {
+    self.emailVerificationCompletedMessage.assertDidNotEmitValue()
+    self.emailVerificationCompletedSuccess.assertDidNotEmitValue()
+
+    guard let url = URL(string: "https://www.kickstarter.com/profile/verify_email?at=12345") else {
+      XCTFail("Should have a url")
+      return
+    }
+
+    let env = EmailVerificationResponseEnvelope(
+      message: "Thanks—you’ve successfully verified your email address."
+    )
+
+    let mockService = MockService(verifyEmailResult: .success(env))
+
+    withEnvironment(apiService: mockService) {
+      _ = self.vm.inputs.applicationOpenUrl(
+        application: UIApplication.shared,
+        url: url,
+        options: [:]
+      )
+
+      self.scheduler.advance()
+
+      self.emailVerificationCompletedSuccess.assertValues([true])
+      self.emailVerificationCompletedMessage.assertValues(
+        ["Thanks—you’ve successfully verified your email address."]
+      )
+    }
+  }
+
+  func testVerifyEmail_Failure() {
+    self.emailVerificationCompletedMessage.assertDidNotEmitValue()
+    self.emailVerificationCompletedSuccess.assertDidNotEmitValue()
+
+    guard let url = URL(string: "https://www.kickstarter.com/profile/verify_email?at=12345") else {
+      XCTFail("Should have a url")
+      return
+    }
+
+    let errorEnvelope = ErrorEnvelope(
+      errorMessages: ["Error Message"],
+      ksrCode: .UnknownCode,
+      httpCode: 403,
+      exception: nil
+    )
+
+    let mockService = MockService(verifyEmailResult: .failure(errorEnvelope))
+
+    withEnvironment(apiService: mockService) {
+      _ = self.vm.inputs.applicationOpenUrl(
+        application: UIApplication.shared,
+        url: url,
+        options: [:]
+      )
+
+      self.scheduler.advance()
+
+      self.emailVerificationCompletedSuccess.assertValues([false])
+      self.emailVerificationCompletedMessage.assertValues(
+        ["Error Message"]
+      )
+    }
+  }
+
+  func testVerifyEmail_Failure_UnknownError() {
+    self.emailVerificationCompletedMessage.assertDidNotEmitValue()
+    self.emailVerificationCompletedSuccess.assertDidNotEmitValue()
+
+    guard let url = URL(string: "https://www.kickstarter.com/profile/verify_email?at=12345") else {
+      XCTFail("Should have a url")
+      return
+    }
+
+    let errorEnvelope = ErrorEnvelope(
+      errorMessages: [],
+      ksrCode: .UnknownCode,
+      httpCode: 500,
+      exception: nil
+    )
+
+    let mockService = MockService(verifyEmailResult: .failure(errorEnvelope))
+
+    withEnvironment(apiService: mockService) {
+      _ = self.vm.inputs.applicationOpenUrl(
+        application: UIApplication.shared,
+        url: url,
+        options: [:]
+      )
+
+      self.scheduler.advance()
+
+      self.emailVerificationCompletedSuccess.assertValues([false])
+      self.emailVerificationCompletedMessage.assertValues(
+        ["Something went wrong, please try again."]
+      )
+    }
+  }
 }
 
 private let backingForCreatorPushData: [String: Any] = [

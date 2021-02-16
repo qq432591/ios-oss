@@ -7,14 +7,11 @@ public enum PledgeStateCTAType {
   case viewBacking
   case viewRewards
   case viewYourRewards
-  // Experimental
-  case seeTheRewards
-  case viewTheRewards
 
   public var buttonTitle: String {
     switch self {
     case .fix:
-      return Strings.Fix()
+      return Strings.Manage()
     case .pledge:
       return Strings.Back_this_project()
     case .manage:
@@ -25,18 +22,14 @@ public enum PledgeStateCTAType {
       return Strings.View_rewards()
     case .viewYourRewards:
       return Strings.View_your_rewards()
-    case .seeTheRewards:
-      return Strings.See_the_rewards()
-    case .viewTheRewards:
-      return Strings.View_the_rewards()
     }
   }
 
   public var buttonStyle: ButtonStyleType {
     switch self {
     case .fix:
-      return .apricot
-    case .pledge, .seeTheRewards, .viewTheRewards:
+      return .red
+    case .pledge:
       return .green
     case .manage:
       return .blue
@@ -47,7 +40,7 @@ public enum PledgeStateCTAType {
 
   public var stackViewIsHidden: Bool {
     switch self {
-    case .pledge, .seeTheRewards, .viewBacking, .viewRewards, .viewYourRewards, .viewTheRewards:
+    case .pledge, .viewBacking, .viewRewards, .viewYourRewards:
       return true
     case .fix, .manage:
       return false
@@ -57,7 +50,7 @@ public enum PledgeStateCTAType {
   public var titleLabel: String? {
     switch self {
     case .fix:
-      return Strings.Check_your_payment_details()
+      return Strings.Payment_failure()
     case .manage:
       return Strings.Youre_a_backer()
     default:
@@ -68,7 +61,7 @@ public enum PledgeStateCTAType {
   public var subtitleLabel: String? {
     switch self {
     case .fix:
-      return Strings.We_couldnt_process_your_pledge()
+      return Strings.We_cant_process_your_pledge()
     default:
       return nil
     }
@@ -76,7 +69,7 @@ public enum PledgeStateCTAType {
 
   public var stackViewAndSpacerAreHidden: Bool {
     switch self {
-    case .pledge, .seeTheRewards, .viewBacking, .viewRewards, .viewYourRewards, .viewTheRewards:
+    case .pledge, .viewBacking, .viewRewards, .viewYourRewards:
       return true
     case .fix, .manage:
       return false

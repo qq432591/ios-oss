@@ -73,11 +73,10 @@
     fileprivate let fetchGraphCreditCardsResponse: UserEnvelope<GraphUserCreditCard>?
     fileprivate let fetchGraphCreditCardsError: GraphError?
 
-    fileprivate let fetchGraphUserAccountFieldsResponse: UserEnvelope<UserAccountFields>?
+    fileprivate let fetchGraphUserAccountFieldsResponse: UserEnvelope<GraphUser>?
     fileprivate let fetchGraphUserAccountFieldsError: GraphError?
 
-    fileprivate let fetchGraphUserBackingsResponse: UserEnvelope<GraphBackingEnvelope>?
-    fileprivate let fetchGraphUserBackingsError: GraphError?
+    fileprivate let fetchGraphUserBackingsResult: Result<BackingsEnvelope, ErrorEnvelope>?
 
     fileprivate let addAttachmentResponse: UpdateDraft.Image?
     fileprivate let addAttachmentError: ErrorEnvelope?
@@ -85,6 +84,9 @@
     fileprivate let removeAttachmentError: ErrorEnvelope?
 
     fileprivate let publishUpdateError: ErrorEnvelope?
+
+    fileprivate let fetchManagePledgeViewBackingResult:
+      Result<ProjectAndBackingEnvelope, ErrorEnvelope>?
 
     fileprivate let fetchMessageThreadResult: Result<MessageThread?, ErrorEnvelope>?
     fileprivate let fetchMessageThreadsResponse: [MessageThread]
@@ -95,12 +97,13 @@
     fileprivate let fetchProjectsResponse: [Project]?
     fileprivate let fetchProjectsError: ErrorEnvelope?
 
-    fileprivate let fetchProjectCreatorDetailsResult: Result<ProjectCreatorDetailsEnvelope, GraphError>?
-
     fileprivate let fetchProjectNotificationsResponse: [ProjectNotification]
 
     fileprivate let fetchProjectStatsResponse: ProjectStatsEnvelope?
     fileprivate let fetchProjectStatsError: ErrorEnvelope?
+
+    fileprivate let fetchRewardAddOnsSelectionViewRewardsResult:
+      Result<Project, ErrorEnvelope>?
 
     fileprivate let fetchShippingRulesResult: Result<[ShippingRule], ErrorEnvelope>?
 
@@ -145,6 +148,8 @@
     fileprivate let sendEmailVerificationResponse: GraphMutationEmptyResponseEnvelope?
     fileprivate let sendEmailVerificationError: GraphError?
 
+    fileprivate let signInWithAppleResult: Result<SignInWithAppleEnvelope, GraphError>?
+
     fileprivate let signupResponse: AccessTokenEnvelope?
     fileprivate let signupError: ErrorEnvelope?
 
@@ -165,6 +170,8 @@
       GraphMutationWatchProjectResponseEnvelope,
       GraphError
     >?
+
+    fileprivate let verifyEmailResult: Result<EmailVerificationResponseEnvelope, ErrorEnvelope>?
 
     fileprivate let watchProjectMutationResult: Result<GraphMutationWatchProjectResponseEnvelope, GraphError>?
 
@@ -236,22 +243,21 @@
       fetchDraftResponse: UpdateDraft? = nil,
       fetchDraftError: ErrorEnvelope? = nil,
       fetchGraphUserEmailFieldsResponse: UserEmailFields? = nil,
-      fetchGraphUserAccountFieldsResponse: UserEnvelope<UserAccountFields>? = nil,
+      fetchGraphUserAccountFieldsResponse: UserEnvelope<GraphUser>? = nil,
       fetchGraphUserAccountFieldsError: GraphError? = nil,
-      fetchGraphUserBackingsResponse: UserEnvelope<GraphBackingEnvelope>? = nil,
-      fetchGraphUserBackingsError: GraphError? = nil,
+      fetchGraphUserBackingsResult: Result<BackingsEnvelope, ErrorEnvelope>? = nil,
       addAttachmentResponse: UpdateDraft.Image? = nil,
       addAttachmentError: ErrorEnvelope? = nil,
       removeAttachmentResponse: UpdateDraft.Image? = nil,
       removeAttachmentError: ErrorEnvelope? = nil,
       publishUpdateError: ErrorEnvelope? = nil,
+      fetchManagePledgeViewBackingResult: Result<ProjectAndBackingEnvelope, ErrorEnvelope>? = nil,
       fetchMessageThreadResult: Result<MessageThread?, ErrorEnvelope>? = nil,
       fetchMessageThreadsResponse: [MessageThread]? = nil,
       fetchProjectResponse: Project? = nil,
       fetchProjectError: ErrorEnvelope? = nil,
       fetchProjectActivitiesResponse: [Activity]? = nil,
       fetchProjectActivitiesError: ErrorEnvelope? = nil,
-      fetchProjectCreatorDetailsResult: Result<ProjectCreatorDetailsEnvelope, GraphError>? = nil,
       fetchProjectNotificationsResponse: [ProjectNotification]? = nil,
       fetchProjectsResponse: [Project]? = nil,
       fetchProjectsError: ErrorEnvelope? = nil,
@@ -266,6 +272,8 @@
       followFriendError: ErrorEnvelope? = nil,
       incrementVideoCompletionError: ErrorEnvelope? = nil,
       incrementVideoStartError: ErrorEnvelope? = nil,
+      fetchRewardAddOnsSelectionViewRewardsResult: Result<Project, ErrorEnvelope>? =
+        nil,
       fetchSurveyResponseResponse: SurveyResponse? = nil,
       fetchSurveyResponseError: ErrorEnvelope? = nil,
       fetchUnansweredSurveyResponsesResponse: [SurveyResponse] = [],
@@ -282,6 +290,7 @@
       resetPasswordError: ErrorEnvelope? = nil,
       sendEmailVerificationResponse: GraphMutationEmptyResponseEnvelope? = nil,
       sendEmailVerificationError: GraphError? = nil,
+      signInWithAppleResult: Result<SignInWithAppleEnvelope, GraphError>? = nil,
       signupResponse: AccessTokenEnvelope? = nil,
       signupError: ErrorEnvelope? = nil,
       unfollowFriendError: ErrorEnvelope? = nil,
@@ -291,9 +300,8 @@
       updateProjectNotificationResponse: ProjectNotification? = nil,
       updateProjectNotificationError: ErrorEnvelope? = nil,
       updateUserSelfError: ErrorEnvelope? = nil,
-      // swiftlint:disable:next line_length
       unwatchProjectMutationResult: Result<GraphMutationWatchProjectResponseEnvelope, GraphError>? = nil,
-      // swiftlint:disable:next line_length
+      verifyEmailResult: Result<EmailVerificationResponseEnvelope, ErrorEnvelope>? = nil,
       watchProjectMutationResult: Result<GraphMutationWatchProjectResponseEnvelope, GraphError>? = nil
     ) {
       self.appId = appId
@@ -352,13 +360,12 @@
       self.fetchGraphCategoriesError = fetchGraphCategoriesError
 
       self.fetchGraphUserAccountFieldsResponse = fetchGraphUserAccountFieldsResponse
-        ?? UserEnvelope(me: UserAccountFields.template)
+        ?? UserEnvelope(me: GraphUser.template)
       self.fetchGraphUserAccountFieldsError = fetchGraphUserAccountFieldsError
 
       self.fetchGraphUserEmailFieldsResponse = fetchGraphUserEmailFieldsResponse
 
-      self.fetchGraphUserBackingsResponse = fetchGraphUserBackingsResponse
-      self.fetchGraphUserBackingsError = fetchGraphUserBackingsError
+      self.fetchGraphUserBackingsResult = fetchGraphUserBackingsResult
 
       self.fetchCommentsResponse = fetchCommentsResponse ?? [
         .template |> Comment.lens.id .~ 2,
@@ -393,6 +400,10 @@
 
       self.publishUpdateError = publishUpdateError
 
+      self.fetchManagePledgeViewBackingResult = fetchManagePledgeViewBackingResult
+
+      self.fetchRewardAddOnsSelectionViewRewardsResult = fetchRewardAddOnsSelectionViewRewardsResult
+
       self.fetchMessageThreadResult = fetchMessageThreadResult
 
       self.fetchMessageThreadsResponse = fetchMessageThreadsResponse ?? [
@@ -421,8 +432,6 @@
       ]
 
       self.fetchProjectsResponse = fetchProjectsResponse ?? []
-
-      self.fetchProjectCreatorDetailsResult = fetchProjectCreatorDetailsResult
 
       self.fetchProjectsError = fetchProjectsError
 
@@ -478,6 +487,8 @@
 
       self.sendEmailVerificationError = sendEmailVerificationError
 
+      self.signInWithAppleResult = signInWithAppleResult
+
       self.signupResponse = signupResponse
 
       self.signupError = signupError
@@ -497,6 +508,8 @@
       self.updateUserSelfError = updateUserSelfError
 
       self.unwatchProjectMutationResult = unwatchProjectMutationResult
+
+      self.verifyEmailResult = verifyEmailResult
 
       self.watchProjectMutationResult = watchProjectMutationResult
     }
@@ -707,7 +720,7 @@
     }
 
     internal func fetchGraphUserAccountFields(query _: NonEmptySet<Query>)
-      -> SignalProducer<UserEnvelope<UserAccountFields>, GraphError> {
+      -> SignalProducer<UserEnvelope<GraphUser>, GraphError> {
       if let error = self.fetchGraphUserAccountFieldsError {
         return SignalProducer(error: error)
       } else if let response = self.fetchGraphUserAccountFieldsResponse {
@@ -718,13 +731,8 @@
     }
 
     internal func fetchGraphUserBackings(query _: NonEmptySet<Query>)
-      -> SignalProducer<UserEnvelope<GraphBackingEnvelope>, GraphError> {
-      if let error = fetchGraphUserBackingsError {
-        return SignalProducer(error: error)
-      }
-      let response = self.fetchGraphUserBackingsResponse ??
-        UserEnvelope<GraphBackingEnvelope>(me: GraphBackingEnvelope.template)
-      return SignalProducer(value: response)
+      -> SignalProducer<BackingsEnvelope, ErrorEnvelope> {
+      return producer(for: self.fetchGraphUserBackingsResult)
     }
 
     internal func fetchGraph<A>(
@@ -824,6 +832,16 @@
       )
 
       return SignalProducer(value: envelope)
+    }
+
+    func fetchManagePledgeViewBacking(query _: NonEmptySet<Query>)
+      -> SignalProducer<ProjectAndBackingEnvelope, ErrorEnvelope> {
+      return producer(for: self.fetchManagePledgeViewBackingResult)
+    }
+
+    func fetchRewardAddOnsSelectionViewRewards(query _: NonEmptySet<Query>)
+      -> SignalProducer<Project, ErrorEnvelope> {
+      return producer(for: self.fetchRewardAddOnsSelectionViewRewardsResult)
     }
 
     internal func fetchMessageThread(messageThreadId _: Int)
@@ -979,11 +997,6 @@
       return .empty
     }
 
-    func fetchProjectCreatorDetails(query _: NonEmptySet<Query>)
-      -> SignalProducer<ProjectCreatorDetailsEnvelope, GraphError> {
-      return producer(for: self.fetchProjectCreatorDetailsResult)
-    }
-
     internal func fetchProjects(member _: Bool) -> SignalProducer<ProjectsEnvelope, ErrorEnvelope> {
       if let error = fetchProjectsError {
         return SignalProducer(error: error)
@@ -1025,24 +1038,6 @@
       }
 
       return SignalProducer(value: .init(shippingRules: self.fetchShippingRulesResult?.value ?? [.template]))
-    }
-
-    internal func fetchUserProjectsBacked() -> SignalProducer<ProjectsEnvelope, ErrorEnvelope> {
-      if let error = fetchUserProjectsBackedError {
-        return SignalProducer(error: error)
-      } else if let projects = fetchUserProjectsBackedResponse {
-        return SignalProducer(
-          value: ProjectsEnvelope(
-            projects: projects,
-            urls: ProjectsEnvelope.UrlsEnvelope(
-              api: ProjectsEnvelope.UrlsEnvelope.ApiEnvelope(
-                moreProjects: ""
-              )
-            )
-          )
-        )
-      }
-      return .empty
     }
 
     internal func fetchUserProjectsBacked(paginationUrl _: String)
@@ -1236,6 +1231,14 @@
       return SignalProducer(value: GraphMutationEmptyResponseEnvelope())
     }
 
+    internal func signInWithApple(input _: SignInWithAppleInput)
+      -> SignalProducer<SignInWithAppleEnvelope, GraphError> {
+      if let error = self.signInWithAppleResult?.error {
+        return SignalProducer(error: error)
+      }
+      return SignalProducer(value: self.signInWithAppleResult?.value ?? SignInWithAppleEnvelope.template)
+    }
+
     internal func signup(
       name: String,
       email _: String,
@@ -1320,23 +1323,14 @@
       return producer(for: self.updateBackingResult)
     }
 
-    internal func updatePledge(
-      project _: Project,
-      amount _: Double,
-      reward _: Reward?,
-      shippingLocation _: Location?,
-      tappedReward _: Bool
-    ) -> SignalProducer<UpdatePledgeEnvelope, ErrorEnvelope> {
-      if let error = self.updatePledgeResult?.error {
-        return SignalProducer(error: error)
-      }
-
-      return SignalProducer(value: self.updatePledgeResult?.value ?? .template)
-    }
-
     internal func unwatchProject(input _: WatchProjectInput)
       -> SignalProducer<GraphMutationWatchProjectResponseEnvelope, GraphError> {
       return producer(for: self.unwatchProjectMutationResult)
+    }
+
+    internal func verifyEmail(withToken _: String)
+      -> SignalProducer<EmailVerificationResponseEnvelope, ErrorEnvelope> {
+      return producer(for: self.verifyEmailResult)
     }
 
     internal func watchProject(input _: WatchProjectInput)
@@ -1362,29 +1356,10 @@
       return SignalProducer(value: self.removeAttachmentResponse ?? .template)
     }
 
-    internal func addVideo(file _: URL, toDraft _: UpdateDraft)
-      -> SignalProducer<UpdateDraft.Video, ErrorEnvelope> {
-      return .empty
-    }
-
-    internal func changePaymentMethod(project _: Project)
-      -> SignalProducer<ChangePaymentMethodEnvelope, ErrorEnvelope> {
-      if let error = self.changePaymentMethodResult?.error {
-        return SignalProducer(error: error)
-      }
-
-      return SignalProducer(value: self.changePaymentMethodResult?.value ?? .template)
-    }
-
     internal func deletePaymentMethod(input _: PaymentSourceDeleteInput) -> SignalProducer<
       DeletePaymentMethodEnvelope, GraphError
     > {
       return producer(for: self.deletePaymentMethodResult)
-    }
-
-    internal func delete(video _: UpdateDraft.Video, fromDraft _: UpdateDraft)
-      -> SignalProducer<UpdateDraft.Video, ErrorEnvelope> {
-      return .empty
     }
 
     internal func publish(draft _: UpdateDraft) -> SignalProducer<Update, ErrorEnvelope> {
@@ -1443,12 +1418,12 @@
             removeAttachmentResponse: $1.removeAttachmentResponse,
             removeAttachmentError: $1.removeAttachmentError,
             publishUpdateError: $1.publishUpdateError,
+            fetchManagePledgeViewBackingResult: $1.fetchManagePledgeViewBackingResult,
             fetchMessageThreadResult: $1.fetchMessageThreadResult,
             fetchMessageThreadsResponse: $1.fetchMessageThreadsResponse,
             fetchProjectResponse: $1.fetchProjectResponse,
             fetchProjectActivitiesResponse: $1.fetchProjectActivitiesResponse,
             fetchProjectActivitiesError: $1.fetchProjectActivitiesError,
-            fetchProjectCreatorDetailsResult: $1.fetchProjectCreatorDetailsResult,
             fetchProjectNotificationsResponse: $1.fetchProjectNotificationsResponse,
             fetchProjectsResponse: $1.fetchProjectsResponse,
             fetchProjectsError: $1.fetchProjectsError,

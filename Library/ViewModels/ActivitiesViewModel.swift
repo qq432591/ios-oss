@@ -7,6 +7,12 @@ public protocol ActitiviesViewModelInputs {
   /// Called when the project image in an update activity cell is tapped.
   func activityUpdateCellTappedProjectImage(activity: Activity)
 
+  /// Call when the controller has received a user updated notification.
+  func currentUserUpdated()
+
+  /// Called when the user tapped to fix an errored pledge.
+  func erroredBackingViewDidTapManage(with backing: ProjectAndBackingEnvelope)
+
   /// Call when the Find Friends section is dismissed.
   func findFriendsHeaderCellDismissHeader()
 
@@ -21,6 +27,9 @@ public protocol ActitiviesViewModelInputs {
 
   /// Call when an alert should be shown.
   func findFriendsFacebookConnectCellShowErrorAlert(_ alert: AlertError)
+
+  /// Call when the ManagePledgeViewController made changes.
+  func managePledgeViewControllerDidFinish()
 
   /// Call when the feed should be refreshed, e.g. pull-to-refresh.
   func refresh()
@@ -68,11 +77,17 @@ public protocol ActivitiesViewModelOutputs {
   /// Emits when should remove Find Friends section.
   var deleteFindFriendsSection: Signal<(), Never> { get }
 
+  /// Emits an array of errored backings to be displayed on the top of the list of projects.
+  var erroredBackings: Signal<[ProjectAndBackingEnvelope], Never> { get }
+
   /// Emits when we should dismiss the empty state controller.
   var hideEmptyState: Signal<(), Never> { get }
 
   /// Emits when should transition to Friends view with source (.Activity).
   var goToFriends: Signal<FriendsSource, Never> { get }
+
+  /// Emits a project and backing Param to navigate to ManagePledgeViewController.
+  var goToManagePledge: Signal<ManagePledgeViewParamConfigData, Never> { get }
 
   /// Emits a project and ref tag that should be used to present a project controller.
   var goToProject: Signal<(Project, RefTag), Never> { get }
@@ -168,20 +183,45 @@ public final class ActivitiesViewModel: ActivitiesViewModelType, ActitiviesViewM
     )
     .ignoreValues()
 
-    self.updateUserInEnvironment = self.clearBadgeValue
+    let userClearingBadgeCountEvent = self.clearBadgeValue
       .filter { _ in AppEnvironment.current.currentUser != nil }
       .switchMap { _ in
         updatedUserWithClearedActivityCountProducer()
           .ksr_delay(AppEnvironment.current.apiDelayInterval, on: AppEnvironment.current.scheduler)
+          .materialize()
       }
+
+    let refreshUserEvent = self.managePledgeViewControllerDidFinishProperty.signal
+      .switchMap { _ in
+        AppEnvironment.current.apiService.fetchUserSelf()
+          .materialize()
+      }
+
+    self.updateUserInEnvironment = Signal.merge(
+      userClearingBadgeCountEvent.values(),
+      refreshUserEvent.values()
+    )
 
     let currentUser = Signal
       .merge(
+        self.currentUserUpdatedProperty.signal.ignoreValues(),
         self.viewDidLoadProperty.signal,
         self.userSessionStartedProperty.signal,
         self.userSessionEndedProperty.signal
       )
-      .map { AppEnvironment.current.currentUser }
+      .map { _ in AppEnvironment.current.currentUser }
+
+    let erroredBackingsEvent = currentUser
+      .skipNil()
+      .switchMap { _ in
+        AppEnvironment.current.apiService.fetchGraphUserBackings(
+          query: UserQueries.backings(BackingState.errored.rawValue).query
+        )
+        .ksr_delay(AppEnvironment.current.apiDelayInterval, on: AppEnvironment.current.scheduler)
+        .materialize()
+      }
+
+    self.erroredBackings = erroredBackingsEvent.values().map(\.projectsAndBackings)
 
     let loggedInForEmptyState = self.activities
       .filter { AppEnvironment.current.currentUser != nil && $0.isEmpty }
@@ -288,13 +328,36 @@ public final class ActivitiesViewModel: ActivitiesViewModelType, ActitiviesViewM
         return SignalProducer(value: (project, update))
       }
 
+    let goToManagePledgeWithBacking = self.erroredBackingViewDidTapManageWithBackingProperty.signal
+      .skipNil()
+
+    self.goToManagePledge = goToManagePledgeWithBacking
+      .map { env -> ManagePledgeViewParamConfigData? in
+        (projectParam: Param.id(env.project.id), backingParam: Param.id(env.backing.id))
+      }
+      .skipNil()
+
+    self.activities.takePairWhen(goToManagePledgeWithBacking)
+      .observeValues { activities, env in
+        let activity = activities.first { $0.project?.id == env.project.id }
+
+        guard let project = activity?.project else { return }
+
+        AppEnvironment.current.ksrAnalytics.trackActivitiesManagePledgeButtonClicked(project: project)
+      }
+
     Signal.zip(pageCount, paginatedActivities)
       .filter { pageCount, _ in
         pageCount == 1
       } // Track first page only
       .map(second)
       .map { $0.count }
-      .observeValues { AppEnvironment.current.koala.trackActivities(count: $0) }
+      .observeValues { AppEnvironment.current.ksrAnalytics.trackActivities(count: $0) }
+  }
+
+  fileprivate let currentUserUpdatedProperty = MutableProperty(())
+  public func currentUserUpdated() {
+    self.currentUserUpdatedProperty.value = ()
   }
 
   fileprivate let dismissFacebookConnectSectionProperty = MutableProperty(())
@@ -305,6 +368,17 @@ public final class ActivitiesViewModel: ActivitiesViewModelType, ActitiviesViewM
   fileprivate let dismissFindFriendsSectionProperty = MutableProperty(())
   public func findFriendsHeaderCellDismissHeader() {
     self.dismissFindFriendsSectionProperty.value = ()
+  }
+
+  fileprivate let erroredBackingViewDidTapManageWithBackingProperty
+    = MutableProperty<ProjectAndBackingEnvelope?>(nil)
+  public func erroredBackingViewDidTapManage(with backing: ProjectAndBackingEnvelope) {
+    self.erroredBackingViewDidTapManageWithBackingProperty.value = backing
+  }
+
+  fileprivate let managePledgeViewControllerDidFinishProperty = MutableProperty(())
+  public func managePledgeViewControllerDidFinish() {
+    self.managePledgeViewControllerDidFinishProperty.value = ()
   }
 
   fileprivate let goToFriendsProperty = MutableProperty(())
@@ -376,9 +450,11 @@ public final class ActivitiesViewModel: ActivitiesViewModelType, ActitiviesViewM
   public let clearBadgeValue: Signal<(), Never>
   public let deleteFacebookConnectSection: Signal<(), Never>
   public let deleteFindFriendsSection: Signal<(), Never>
+  public let erroredBackings: Signal<[ProjectAndBackingEnvelope], Never>
   public let hideEmptyState: Signal<(), Never>
   public let isRefreshing: Signal<Bool, Never>
   public let goToFriends: Signal<FriendsSource, Never>
+  public let goToManagePledge: Signal<ManagePledgeViewParamConfigData, Never>
   public let goToProject: Signal<(Project, RefTag), Never>
   public let goToSurveyResponse: Signal<SurveyResponse, Never>
   public let goToUpdate: Signal<(Project, Update), Never>

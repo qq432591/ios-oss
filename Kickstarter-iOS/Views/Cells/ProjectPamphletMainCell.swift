@@ -3,17 +3,11 @@ import Library
 import Prelude
 import UIKit
 
-private enum Layout {
-  enum Button {
-    static let height: CGFloat = 48
-  }
-}
-
 internal protocol ProjectPamphletMainCellDelegate: VideoViewControllerDelegate {
   func projectPamphletMainCell(_ cell: ProjectPamphletMainCell, addChildController child: UIViewController)
   func projectPamphletMainCell(
     _ cell: ProjectPamphletMainCell,
-    goToCampaignForProjectWith projectAndRefTag: (project: Project, refTag: RefTag?)
+    goToCampaignForProjectWith project: Project
   )
   func projectPamphletMainCell(_ cell: ProjectPamphletMainCell, goToCreatorForProject project: Project)
 }
@@ -29,23 +23,10 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
 
   fileprivate weak var videoController: VideoViewController?
 
-  private lazy var creatorBylineView: CreatorBylineView = {
-    CreatorBylineView(frame: .zero)
-      |> \.translatesAutoresizingMaskIntoConstraints .~ false
-  }()
-
-  private lazy var creatorBylineTapGesture: UITapGestureRecognizer = {
-    UITapGestureRecognizer(target: self, action: #selector(creatorBylineTapped))
-  }()
-
-  private lazy var creatorBylineShimmerLoadingView: ProjectCreatorDetailsShimmerLoadingView = {
-    ProjectCreatorDetailsShimmerLoadingView(frame: .zero)
-      |> \.translatesAutoresizingMaskIntoConstraints .~ false
-  }()
-
   @IBOutlet fileprivate var backersSubtitleLabel: UILabel!
   @IBOutlet fileprivate var backersTitleLabel: UILabel!
   @IBOutlet fileprivate var blurbAndReadMoreStackView: UIStackView!
+  @IBOutlet fileprivate var blurbStackView: UIStackView!
   @IBOutlet fileprivate var categoryStackView: UIStackView!
   @IBOutlet fileprivate var categoryAndLocationStackView: UIStackView!
   @IBOutlet fileprivate var categoryIconImageView: UIImageView!
@@ -70,11 +51,12 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
   @IBOutlet fileprivate var projectNameAndCreatorStackView: UIStackView!
   @IBOutlet fileprivate var projectNameLabel: UILabel!
   @IBOutlet fileprivate var progressBarAndStatsStackView: UIStackView!
-  @IBOutlet fileprivate var readMoreButton: LoadingButton!
-  @IBOutlet fileprivate var spacerView: UIView!
+  @IBOutlet fileprivate var readMoreButton: UIButton!
+  @IBOutlet fileprivate var readMoreStackView: UIStackView!
   @IBOutlet fileprivate var stateLabel: UILabel!
   @IBOutlet fileprivate var statsStackView: UIStackView!
   @IBOutlet fileprivate var youreABackerContainerView: UIView!
+  @IBOutlet fileprivate var youreABackerContainerViewLeadingConstraint: NSLayoutConstraint!
   @IBOutlet fileprivate var youreABackerLabel: UILabel!
 
   internal override func awakeFromNib() {
@@ -91,18 +73,10 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
       for: .touchUpInside
     )
 
-    self.readMoreButton.heightAnchor
-      .constraint(greaterThanOrEqualToConstant: Layout.Button.height).isActive = true
-
-    _ = ([self.creatorBylineView, self.creatorBylineShimmerLoadingView], self.projectNameAndCreatorStackView)
-      |> ksr_addArrangedSubviewsToStackView()
-
-    self.creatorBylineView.addGestureRecognizer(self.creatorBylineTapGesture)
-
     self.viewModel.inputs.awakeFromNib()
   }
 
-  internal func configureWith(value: (Project, RefTag?, ProjectCreatorDetailsData)) {
+  internal func configureWith(value: ProjectPamphletMainCellData) {
     self.viewModel.inputs.configureWith(value: value)
   }
 
@@ -127,6 +101,9 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
   internal override func bindStyles() {
     super.bindStyles()
 
+    // maintain vertical spacing in one place so that it's consistent in nested stackviews
+    let verticalSpacing = Styles.grid(3)
+
     _ = self
       |> baseTableViewCellStyle()
       |> UITableViewCell.lens.clipsToBounds .~ true
@@ -134,10 +111,10 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
 
     let subtitleLabelStyling = UILabel.lens.font .~ .ksr_caption1(size: 13)
       <> UILabel.lens.numberOfLines .~ 1
-      <> UILabel.lens.backgroundColor .~ .white
+      <> UILabel.lens.backgroundColor .~ .ksr_white
 
     _ = [self.backersSubtitleLabel, self.deadlineSubtitleLabel]
-      ||> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      ||> UILabel.lens.textColor .~ .ksr_support_400
       ||> subtitleLabelStyling
 
     _ = self.pledgeSubtitleLabel |> subtitleLabelStyling
@@ -145,36 +122,57 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
     _ = [self.backersTitleLabel, self.deadlineTitleLabel, self.pledgedTitleLabel]
       ||> UILabel.lens.font .~ .ksr_headline(size: 13)
       ||> UILabel.lens.numberOfLines .~ 1
-      ||> UILabel.lens.backgroundColor .~ .white
+      ||> UILabel.lens.backgroundColor .~ .ksr_white
 
     _ = self.categoryStackView
       |> UIStackView.lens.spacing .~ Styles.grid(1)
 
-    _ = self.categoryAndLocationStackView
-      |> UIStackView.lens.layoutMargins .~ .init(top: 0, left: 0, bottom: Styles.grid(1), right: 0)
-
     _ = self.categoryIconImageView
       |> UIImageView.lens.contentMode .~ .scaleAspectFit
-      |> UIImageView.lens.tintColor .~ .ksr_dark_grey_500
+      |> UIImageView.lens.tintColor .~ .ksr_support_400
       |> UIImageView.lens.image .~ UIImage(named: "category-icon")
-      |> UIImageView.lens.backgroundColor .~ .white
+      |> UIImageView.lens.backgroundColor .~ .ksr_white
 
     _ = self.categoryNameLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_body(size: 12)
-      |> UILabel.lens.backgroundColor .~ .white
+      |> UILabel.lens.backgroundColor .~ .ksr_white
+
+    let leftRightInsetValue: CGFloat = self.traitCollection.isRegularRegular
+      ? Styles.grid(16)
+      : Styles.grid(4)
+
+    _ = self.categoryAndLocationStackView
+      |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
+      |> UIStackView.lens.layoutMargins .~ UIEdgeInsets(
+        leftRight: leftRightInsetValue
+      )
 
     _ = self.contentStackView
       |> UIStackView.lens.layoutMargins %~~ { _, stackView in
         stackView.traitCollection.isRegularRegular
-          ? .init(topBottom: Styles.grid(6), leftRight: Styles.grid(16))
-          : .init(top: Styles.grid(4), left: Styles.grid(4), bottom: Styles.grid(3), right: Styles.grid(4))
+          ? .init(topBottom: Styles.grid(6))
+          : .init(top: Styles.grid(4), left: 0, bottom: Styles.grid(3), right: 0)
       }
       |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
-      |> UIStackView.lens.spacing .~ Styles.grid(4)
+      |> UIStackView.lens.spacing .~ verticalSpacing
+
+    _ = (self.projectNameAndCreatorStackView, self.contentStackView)
+      |> ksr_setCustomSpacing(Styles.grid(4))
+
+    _ = self.blurbAndReadMoreStackView
+      |> \.spacing .~ verticalSpacing
+
+    _ = self.blurbStackView
+      |> UIStackView.lens.layoutMargins .~ UIEdgeInsets(leftRight: leftRightInsetValue)
+      |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
+
+    _ = self.readMoreStackView
+      |> UIStackView.lens.layoutMargins .~ UIEdgeInsets(leftRight: leftRightInsetValue)
+      |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
 
     _ = self.conversionLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_400
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ UIFont.ksr_caption2().italicized
       |> UILabel.lens.numberOfLines .~ 2
 
@@ -189,27 +187,27 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
       |> UIImageView.lens.contentMode .~ .scaleAspectFill
 
     _ = self.creatorLabel
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
       |> UILabel.lens.font .~ .ksr_headline(size: 13)
-      |> UILabel.lens.backgroundColor .~ .white
+      |> UILabel.lens.backgroundColor .~ .ksr_white
 
     _ = self.creatorStackView
       |> UIStackView.lens.alignment .~ .center
       |> UIStackView.lens.spacing .~ Styles.grid(1)
 
     _ = self.fundingProgressContainerView
-      |> UIView.lens.backgroundColor .~ .ksr_navy_400
+      |> UIView.lens.backgroundColor .~ .ksr_support_300
 
     _ = self.locationImageView
       |> UIImageView.lens.contentMode .~ .scaleAspectFit
-      |> UIImageView.lens.tintColor .~ .ksr_dark_grey_500
+      |> UIImageView.lens.tintColor .~ .ksr_support_400
       |> UIImageView.lens.image .~ UIImage(named: "location-icon")
-      |> UIImageView.lens.backgroundColor .~ .white
+      |> UIImageView.lens.backgroundColor .~ .ksr_white
 
     _ = self.locationNameLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_body(size: 12)
-      |> UILabel.lens.backgroundColor .~ .white
+      |> UILabel.lens.backgroundColor .~ .ksr_white
 
     _ = self.locationStackView
       |> UIStackView.lens.spacing .~ Styles.grid(1)
@@ -220,12 +218,14 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
           ? .ksr_body(size: 18)
           : .ksr_body(size: 15)
       }
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.numberOfLines .~ 0
-      |> UILabel.lens.backgroundColor .~ .white
+      |> UILabel.lens.backgroundColor .~ .ksr_white
 
     _ = self.projectNameAndCreatorStackView
-      |> UIStackView.lens.spacing .~ Styles.grid(2)
+      |> UIStackView.lens.spacing .~ (verticalSpacing / 2)
+      |> UIStackView.lens.layoutMargins .~ UIEdgeInsets(leftRight: leftRightInsetValue)
+      |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
 
     _ = self.projectNameLabel
       |> UILabel.lens.font %~~ { _, label in
@@ -233,12 +233,14 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
           ? .ksr_title3(size: 28)
           : .ksr_title3(size: 20)
       }
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
       |> UILabel.lens.numberOfLines .~ 0
-      |> UILabel.lens.backgroundColor .~ .white
+      |> UILabel.lens.backgroundColor .~ .ksr_white
 
     _ = self.progressBarAndStatsStackView
-      |> UIStackView.lens.spacing .~ Styles.grid(2)
+      |> UIStackView.lens.layoutMargins .~ UIEdgeInsets(leftRight: leftRightInsetValue)
+      |> UIStackView.lens.isLayoutMarginsRelativeArrangement .~ true
+      |> UIStackView.lens.spacing .~ verticalSpacing
 
     _ = self.stateLabel
       |> UILabel.lens.font .~ .ksr_headline(size: 12)
@@ -246,20 +248,24 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
 
     _ = self.statsStackView
       |> UIStackView.lens.isAccessibilityElement .~ true
-      |> UIStackView.lens.backgroundColor .~ .white
+      |> UIStackView.lens.backgroundColor .~ .ksr_white
+
+    _ = self.youreABackerContainerViewLeadingConstraint
+      |> \.constant .~ leftRightInsetValue
 
     _ = self.youreABackerContainerView
       |> roundedStyle(cornerRadius: 2)
-      |> UIView.lens.backgroundColor .~ .ksr_green_500
+      |> UIView.lens.backgroundColor .~ .ksr_create_700
       |> UIView.lens.layoutMargins .~ .init(topBottom: Styles.grid(1), leftRight: Styles.gridHalf(3))
 
     _ = self.youreABackerLabel
-      |> UILabel.lens.textColor .~ .white
+      |> UILabel.lens.textColor .~ .ksr_white
       |> UILabel.lens.font .~ .ksr_headline(size: 12)
       |> UILabel.lens.text %~ { _ in Strings.Youre_a_backer() }
 
     _ = self.readMoreButton
-      |> \.activityIndicatorStyle .~ .gray
+      |> readMoreButtonStyle
+      |> UIButton.lens.title(for: .normal) %~ { _ in Strings.Read_more_about_the_campaign_arrow() }
   }
 
   internal override func bindViewModel() {
@@ -273,10 +279,6 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
     self.conversionLabel.rac.text = self.viewModel.outputs.conversionLabelText
     self.creatorButton.rac.accessibilityLabel = self.viewModel.outputs.creatorLabelText
     self.creatorLabel.rac.text = self.viewModel.outputs.creatorLabelText
-    self.creatorButton.rac.hidden = self.viewModel.outputs.creatorButtonIsHidden
-    self.creatorBylineView.rac.hidden = self.viewModel.outputs.creatorBylineViewHidden
-    self.creatorBylineShimmerLoadingView.rac.hidden = self.viewModel.outputs.creatorBylineShimmerViewHidden
-    self.creatorStackView.rac.hidden = self.viewModel.outputs.creatorStackViewHidden
     self.deadlineSubtitleLabel.rac.text = self.viewModel.outputs.deadlineSubtitleLabelText
     self.deadlineTitleLabel.rac.text = self.viewModel.outputs.deadlineTitleLabelText
     self.deadlineTitleLabel.rac.textColor = self.viewModel.outputs.projectUnsuccessfulLabelTextColor
@@ -289,64 +291,30 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
     self.pledgedTitleLabel.rac.textColor = self.viewModel.outputs.pledgedTitleLabelTextColor
     self.projectBlurbLabel.rac.text = self.viewModel.outputs.projectBlurbLabelText
     self.projectNameLabel.rac.text = self.viewModel.outputs.projectNameLabelText
-    self.readMoreButton.rac.title = self.viewModel.outputs.readMoreButtonTitle
-    self.spacerView.rac.hidden = self.viewModel.outputs.spacerViewHidden
     self.stateLabel.rac.text = self.viewModel.outputs.projectStateLabelText
     self.stateLabel.rac.textColor = self.viewModel.outputs.projectStateLabelTextColor
     self.stateLabel.rac.hidden = self.viewModel.outputs.stateLabelHidden
     self.statsStackView.rac.accessibilityLabel = self.viewModel.outputs.statsStackViewAccessibilityLabel
     self.youreABackerContainerView.rac.hidden = self.viewModel.outputs.youreABackerLabelHidden
 
-    self.viewModel.outputs.readMoreButtonIsLoading
-      .observeForUI()
-      .observeValues { [weak self] isLoading in
-        self?.readMoreButton.isLoading = isLoading
-      }
-
     self.viewModel.outputs.configureVideoPlayerController
       .observeForUI()
       .observeValues { [weak self] in self?.configureVideoPlayerController(forProject: $0) }
-
-    self.viewModel.outputs.configureCreatorBylineView
-      .observeForUI()
-      .observeValues { [weak self] project, creatorDetails in
-        self?.creatorBylineView.configureWith(project: project, creatorDetails: creatorDetails)
-      }
 
     self.viewModel.outputs.creatorImageUrl
       .observeForUI()
       .on(event: { [weak self] _ in self?.creatorImageView.image = nil })
       .skipNil()
-      .observeValues { [weak self] in self?.creatorImageView.af_setImage(withURL: $0) }
+      .observeValues { [weak self] in self?.creatorImageView.af.setImage(withURL: $0) }
 
-    self.viewModel.outputs.notifyDelegateToGoToCampaignWithProjectAndRefTag
+    self.viewModel.outputs.notifyDelegateToGoToCampaignWithProject
       .observeForControllerAction()
       .observeValues { [weak self] in
         guard let self = self else { return }
         self.delegate?.projectPamphletMainCell(self, goToCampaignForProjectWith: $0)
       }
 
-    self.viewModel.outputs.readMoreButtonStyle
-      .observeForUI()
-      .observeValues { [weak self] buttonStyleType in
-        _ = self?.readMoreButton
-          ?|> buttonStyleType.style
-      }
-
-    self.viewModel.outputs.blurbAndReadMoreStackViewSpacing
-      .observeForUI()
-      .observeValues { [weak self] spacing in
-        self?.blurbAndReadMoreStackView.spacing = spacing
-      }
-
     self.viewModel.outputs.notifyDelegateToGoToCreator
-      .observeForControllerAction()
-      .observeValues { [weak self] in
-        guard let self = self else { return }
-        self.delegate?.projectPamphletMainCell(self, goToCreatorForProject: $0)
-      }
-
-    self.viewModel.outputs.notifyDelegateToGoToCreatorFromByline
       .observeForControllerAction()
       .observeValues { [weak self] in
         guard let self = self else { return }
@@ -398,10 +366,6 @@ internal final class ProjectPamphletMainCell: UITableViewCell, ValueCell {
 
   @objc fileprivate func readMoreButtonTapped() {
     self.viewModel.inputs.readMoreButtonTapped()
-  }
-
-  @objc fileprivate func creatorBylineTapped() {
-    self.viewModel.inputs.creatorBylineTapped()
   }
 
   @objc fileprivate func creatorButtonTapped() {

@@ -2,12 +2,30 @@
 import XCTest
 
 final class PledgeViewContextTests: TestCase {
+  func testFixPaymentMethod() {
+    let context = PledgeViewContext.fixPaymentMethod
+
+    XCTAssertTrue(context.confirmationLabelHidden)
+    XCTAssertTrue(context.continueViewHidden)
+    XCTAssertTrue(context.descriptionViewHidden)
+    XCTAssertTrue(context.expandableRewardViewHidden)
+    XCTAssertTrue(context.isUpdating)
+    XCTAssertFalse(context.isCreating)
+    XCTAssertFalse(context.paymentMethodsViewHidden)
+    XCTAssertTrue(context.pledgeAmountViewHidden)
+    XCTAssertFalse(context.pledgeAmountSummaryViewHidden)
+    XCTAssertTrue(context.sectionSeparatorsHidden)
+    XCTAssertEqual(context.submitButtonTitle, "Confirm")
+    XCTAssertEqual(context.title, "Fix payment method")
+  }
+
   func testPledge() {
     let context = PledgeViewContext.pledge
 
     XCTAssertFalse(context.confirmationLabelHidden)
     XCTAssertFalse(context.continueViewHidden)
     XCTAssertFalse(context.descriptionViewHidden)
+    XCTAssertFalse(context.expandableRewardViewHidden)
     XCTAssertFalse(context.isUpdating)
     XCTAssertTrue(context.isCreating)
     XCTAssertFalse(context.paymentMethodsViewHidden)
@@ -25,11 +43,12 @@ final class PledgeViewContextTests: TestCase {
     XCTAssertFalse(context.confirmationLabelHidden)
     XCTAssertTrue(context.continueViewHidden)
     XCTAssertTrue(context.descriptionViewHidden)
+    XCTAssertTrue(context.expandableRewardViewHidden)
     XCTAssertTrue(context.isUpdating)
     XCTAssertFalse(context.isCreating)
     XCTAssertTrue(context.paymentMethodsViewHidden)
     XCTAssertFalse(context.pledgeAmountViewHidden)
-    XCTAssertTrue(context.pledgeAmountSummaryViewHidden)
+    XCTAssertFalse(context.pledgeAmountSummaryViewHidden)
     XCTAssertTrue(context.sectionSeparatorsHidden)
     XCTAssertEqual(context.submitButtonTitle, "Confirm")
     XCTAssertEqual(context.title, "Update pledge")
@@ -41,6 +60,7 @@ final class PledgeViewContextTests: TestCase {
     XCTAssertTrue(context.confirmationLabelHidden)
     XCTAssertTrue(context.continueViewHidden)
     XCTAssertTrue(context.descriptionViewHidden)
+    XCTAssertTrue(context.expandableRewardViewHidden)
     XCTAssertTrue(context.isUpdating)
     XCTAssertFalse(context.isCreating)
     XCTAssertFalse(context.paymentMethodsViewHidden)
@@ -57,6 +77,7 @@ final class PledgeViewContextTests: TestCase {
     XCTAssertTrue(context.confirmationLabelHidden)
     XCTAssertTrue(context.continueViewHidden)
     XCTAssertFalse(context.descriptionViewHidden)
+    XCTAssertFalse(context.expandableRewardViewHidden)
     XCTAssertTrue(context.isUpdating)
     XCTAssertFalse(context.isCreating)
     XCTAssertTrue(context.paymentMethodsViewHidden)

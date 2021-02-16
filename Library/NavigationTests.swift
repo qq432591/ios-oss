@@ -1,4 +1,3 @@
-// swiftlint:disable force_unwrapping
 import KsApi
 @testable import Library
 import Prelude
@@ -121,6 +120,11 @@ public final class NavigationTests: XCTestCase {
     )
 
     KSRAssertMatch(
+      .project(.slug("project"), .pledge(.manage), refTag: .emailBackerFailedTransaction),
+      "/projects/creator/project/pledge?ref=ksr_email_backer_failed_transaction"
+    )
+
+    KSRAssertMatch(
       .project(.slug("project"), .updates, refTag: nil),
       "/projects/creator/project/posts"
     )
@@ -192,6 +196,11 @@ public final class NavigationTests: XCTestCase {
     KSRAssertMatch(
       .user(.slug("self"), .survey(3)),
       "/users/self/surveys/3"
+    )
+
+    KSRAssertMatch(
+      .profile(.verifyEmail),
+      "/profile/verify_email"
     )
   }
 

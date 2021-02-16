@@ -126,17 +126,17 @@ public final class SettingsNotificationCellViewModel: SettingsNotificationCellVi
 
     self.pushNotificationsButtonAccessibilityLabel =
       Signal.combineLatest(self.pushNotificationsEnabled, cellType)
-      .map { pushNotificationEnabled, cellType in
-        pushNotificationEnabled ? Strings.Notification_push_notification_on(notification: cellType.title)
-          : Strings.Notification_push_notification_off(notification: cellType.title)
-      }
+        .map { pushNotificationEnabled, cellType in
+          pushNotificationEnabled ? Strings.Notification_push_notification_on(notification: cellType.title)
+            : Strings.Notification_push_notification_off(notification: cellType.title)
+        }
 
     self.emailNotificationsButtonAccessibilityLabel =
       Signal.combineLatest(self.emailNotificationsEnabled, cellType)
-      .map { emailNotificationEnabled, cellType in
-        emailNotificationEnabled ? Strings.Notification_email_notification_on(notification: cellType.title)
-          : Strings.Notification_email_notification_off(notification: cellType.title)
-      }
+        .map { emailNotificationEnabled, cellType in
+          emailNotificationEnabled ? Strings.Notification_email_notification_on(notification: cellType.title)
+            : Strings.Notification_email_notification_off(notification: cellType.title)
+        }
 
     self.emailNotificationButtonIsHidden = cellType
       .map { $0.shouldShowEmailNotificationButton }
@@ -153,14 +153,6 @@ public final class SettingsNotificationCellViewModel: SettingsNotificationCellVi
 
     self.projectCountText = initialUser
       .map { Format.wholeNumber($0.stats.backedProjectsCount ?? 0) }
-
-    // Koala tracking
-    userAttributeChanged.observeValues { notification, enabled in
-      SettingsNotificationCellViewModel.trackNotificationStateChanged(
-        notification: notification,
-        enabled: enabled
-      )
-    }
   }
 
   fileprivate let pushNotificationValueChangedProperty = MutableProperty(false)
@@ -201,40 +193,6 @@ public enum NotificationType {
 }
 
 extension SettingsNotificationCellViewModel {
-  static func trackNotificationStateChanged(notification: UserAttribute.Notification?, enabled: Bool) {
-    guard let notification = notification else {
-      return
-    }
-
-    switch notification {
-    case .mobileComments,
-         .mobileFollower,
-         .mobileFriendActivity,
-         .mobilePledgeActivity,
-         .mobilePostLikes,
-         .mobileMessages,
-         .mobileUpdates:
-      AppEnvironment.current.koala.trackChangePushNotification(
-        type: notification.trackingString,
-        on: enabled
-      )
-    case .commentReplies,
-         .comments,
-         .follower,
-         .friendActivity,
-         .messages,
-         .pledgeActivity,
-         .postLikes,
-         .creatorTips,
-         .updates:
-      AppEnvironment.current.koala.trackChangeEmailNotification(
-        type: notification.trackingString,
-        on: enabled
-      )
-    default: break
-    }
-  }
-
   public static func notificationFor(
     cellType: SettingsNotificationCellType,
     notificationType: NotificationType

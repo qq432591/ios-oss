@@ -53,8 +53,8 @@ public class EditorialProjectsViewModel: EditorialProjectsViewModelType,
       .skipRepeats()
 
     self.closeButtonImageTintColor = Signal.merge(
-      self.viewDidLoadProperty.signal.mapConst(.white),
-      needsLightTreatment.map { $0 ? .white : .ksr_soft_black }
+      self.viewDidLoadProperty.signal.mapConst(.ksr_white),
+      needsLightTreatment.map { $0 ? .ksr_white : .ksr_support_700 }
     )
     .skipRepeats()
 
@@ -65,7 +65,7 @@ public class EditorialProjectsViewModel: EditorialProjectsViewModelType,
       .map(\.y)
 
     configureWithParams
-      .observeValues { AppEnvironment.current.koala.trackCollectionViewed(params: $0) }
+      .observeValues { AppEnvironment.current.ksrAnalytics.trackCollectionViewed(params: $0) }
   }
 
   private let closeButtonTappedProperty = MutableProperty(())
@@ -107,16 +107,13 @@ public class EditorialProjectsViewModel: EditorialProjectsViewModelType,
 
 private func editorialImageName(for tagId: DiscoveryParams.TagID) -> String {
   switch tagId {
-  case .goRewardless:
-    if AppEnvironment.current.device.userInterfaceIdiom == .pad {
-      return "go-rewardless-modal-large"
-    }
-    return "go-rewardless-modal"
+  case .lightsOn:
+    return "lights-on"
   }
 }
 
 private func editorialTitleLabelText(for tagId: DiscoveryParams.TagID) -> String {
   switch tagId {
-  case .goRewardless: return Strings.This_holiday_season_support_a_project_for_no_reward()
+  case .lightsOn: return Strings.Show_up_for_the_spaces_you_love()
   }
 }

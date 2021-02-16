@@ -49,11 +49,11 @@ internal final class DebugPushNotificationsViewController: UIViewController {
       ||> UIStackView.lens.spacing .~ Styles.grid(1)
 
     _ = titleLabels
-      ||> UILabel.lens.textColor .~ .ksr_text_navy_600
+      ||> UILabel.lens.textColor .~ .ksr_support_400
       ||> UILabel.lens.font .~ .ksr_title1(size: 22)
 
     _ = rowStackViews.compactMap { $0.arrangedSubviews.first as? UILabel }
-      ||> UILabel.lens.textColor .~ .ksr_soft_black
+      ||> UILabel.lens.textColor .~ .ksr_support_700
       ||> UILabel.lens.font .~ .ksr_body()
 
     _ = buttons
@@ -209,7 +209,6 @@ private let surveyPushData: [String: Any] = [
   ]
 ]
 
-// swiftlint:disable line_length
 private let reminderPushData: [String: Any] = [
   "aps": [
     "alert": "Reminder! This Pile of Wood is ending soon."
@@ -219,7 +218,6 @@ private let reminderPushData: [String: Any] = [
     "id": 820_501_933
   ]
 ]
-// swiftlint:enable line_length
 
 private let backingForCreatorPushData: [String: Any] = [
   "aps": [

@@ -35,8 +35,8 @@ internal final class ProjectActivitiesViewController: UITableViewController {
       .observeForControllerAction()
       .observeValues { [weak self] goTo in
         switch goTo {
-        case let .backing(project, user):
-          self?.goToBacking(project: project, user: user)
+        case let .backing(params):
+          self?.goToBacking(params: params)
         case let .comments(project, update):
           self?.goToComments(project: project, update: update)
         case let .project(project):
@@ -89,15 +89,14 @@ internal final class ProjectActivitiesViewController: UITableViewController {
     self.viewModel.inputs.activityAndProjectCellTapped(activity: activity, project: project)
   }
 
-  internal func goToBacking(project: Project, user: User) {
-    let vc = BackingViewController.configuredWith(project: project, backer: user)
+  internal func goToBacking(params: ManagePledgeViewParamConfigData) {
+    let vc = ManagePledgeViewController.controller(with: params)
+
     if self.traitCollection.userInterfaceIdiom == .pad {
-      let nav = UINavigationController(rootViewController: vc)
-      nav.modalPresentationStyle = UIModalPresentationStyle.formSheet
-      self.present(nav, animated: true, completion: nil)
-    } else {
-      self.navigationController?.pushViewController(vc, animated: true)
+      vc.modalPresentationStyle = UIModalPresentationStyle.formSheet
     }
+
+    self.present(vc, animated: true)
   }
 
   internal func goToComments(project: Project?, update: Update?) {
@@ -113,12 +112,15 @@ internal final class ProjectActivitiesViewController: UITableViewController {
 
   internal func goToProject(project: Project) {
     let vc = ProjectNavigatorViewController.configuredWith(project: project, refTag: .dashboardActivity)
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      vc.modalPresentationStyle = .fullScreen
+    }
     self.present(vc, animated: true, completion: nil)
   }
 
   internal func goToSendMessage(
     backing: Backing,
-    context: Koala.MessageDialogContext
+    context: KSRAnalytics.MessageDialogContext
   ) {
     let vc = MessageDialogViewController.configuredWith(messageSubject: .backing(backing), context: context)
     vc.modalPresentationStyle = .formSheet
@@ -157,8 +159,8 @@ extension ProjectActivitiesViewController: MessageDialogViewControllerDelegate {
 }
 
 extension ProjectActivitiesViewController: ProjectActivityBackingCellDelegate {
-  internal func projectActivityBackingCellGoToBacking(project: Project, user: User) {
-    self.viewModel.inputs.projectActivityBackingCellGoToBacking(project: project, user: user)
+  internal func projectActivityBackingCellGoToBacking(project: Project, backing: Backing) {
+    self.viewModel.inputs.projectActivityBackingCellGoToBacking(project: project, backing: backing)
   }
 
   internal func projectActivityBackingCellGoToSendMessage(project: Project, backing: Backing) {

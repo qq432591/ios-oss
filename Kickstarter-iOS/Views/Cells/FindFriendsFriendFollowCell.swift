@@ -16,7 +16,7 @@ internal final class FindFriendsFriendFollowCell: UITableViewCell, ValueCell {
   fileprivate let viewModel: FindFriendsFriendFollowCellViewModelType = FindFriendsFriendFollowCellViewModel()
 
   func configureWith(value: (friend: User, source: FriendsSource)) {
-    self.viewModel.inputs.configureWith(friend: value.friend, source: value.source)
+    self.viewModel.inputs.configureWith(friend: value.friend)
   }
 
   override func bindViewModel() {
@@ -47,7 +47,7 @@ internal final class FindFriendsFriendFollowCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.imageURL
       .observeForUI()
       .on(event: { [weak avatarImageView] _ in
-        avatarImageView?.af_cancelImageRequest()
+        avatarImageView?.af.cancelImageRequest()
         avatarImageView?.image = nil
       })
       .skipNil()
@@ -63,36 +63,36 @@ internal final class FindFriendsFriendFollowCell: UITableViewCell, ValueCell {
       |> ignoresInvertColorsImageViewStyle
 
     _ = self.friendNameLabel
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
       |> UILabel.lens.font .~ UIFont.ksr_headline(size: 14.0)
 
     _ = self.self.friendLocationLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_400
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_caption1()
 
     _ = self.projectsBackedLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_footnote()
 
     _ = self.projectsCreatedLabel
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_500
+      |> UILabel.lens.textColor .~ .ksr_support_400
       |> UILabel.lens.font .~ .ksr_footnote()
 
     _ = self.followButton
       |> blackButtonStyle
-      |> UIButton.lens.targets .~ [(self, action: #selector(followButtonTapped), .touchUpInside)]
+      |> UIButton.lens.targets .~ [(self, action: #selector(self.followButtonTapped), .touchUpInside)]
       |> UIButton.lens.title(for: .normal) %~ { _ in Strings.social_following_friend_buttons_follow() }
 
     _ = self.unfollowButton
       |> greyButtonStyle
-      |> UIButton.lens.targets .~ [(self, action: #selector(unfollowButtonTapped), .touchUpInside)]
+      |> UIButton.lens.targets .~ [(self, action: #selector(self.unfollowButtonTapped), .touchUpInside)]
       |> UIButton.lens.title(for: .normal) %~ { _ in
         Strings.social_following_friend_buttons_following()
       }
 
     _ = self
       |> baseTableViewCellStyle()
-      |> UITableViewCell.lens.backgroundColor .~ .white
+      |> UITableViewCell.lens.backgroundColor .~ .ksr_white
       |> UITableViewCell.lens.contentView.layoutMargins %~~ { _, cell in
         cell.traitCollection.isRegularRegular
           ? .init(topBottom: Styles.grid(2), leftRight: Styles.grid(20))

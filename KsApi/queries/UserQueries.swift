@@ -21,48 +21,67 @@ public enum UserQueries: Queryable {
 }
 
 public func accountQueryFields() -> NonEmptySet<Query.User> {
-  return .chosenCurrency +| [.isEmailVerified, .isEmailDeliverable, .hasPassword, .email]
+  return GraphUser.baseQueryProperties
+    .op(
+      .chosenCurrency +| [
+        .isAppleConnected,
+        .isEmailVerified,
+        .isEmailDeliverable,
+        .hasPassword,
+        .email
+      ]
+    )
 }
 
 public func storedCardsQueryFields() -> NonEmptySet<Query.User> {
-  return .id +| [
-    .storedCards(
-      [],
-      .totalCount +| [
-        .nodes(
-          .id +| [
-            .expirationDate,
-            .lastFour,
-            .type
-          ]
-        )
-      ]
+  return GraphUser.baseQueryProperties
+    .op(
+      Query.User.storedCards(
+        [],
+        .totalCount +| [
+          .nodes(
+            .id +| [
+              .expirationDate,
+              .lastFour,
+              .type
+            ]
+          )
+        ]
+      ) +| []
     )
-  ]
 }
 
 public func changeEmailQueryFields() -> NonEmptySet<Query.User> {
-  return .email +| [.isEmailVerified, .isEmailDeliverable]
+  return GraphUser.baseQueryProperties
+    .op(
+      .email +| [
+        .isEmailVerified,
+        .isEmailDeliverable
+      ]
+    )
 }
 
 public func backingsQueryFields(status: String) -> NonEmptySet<Query.User> {
-  return .id +| [
-    .backings(
-      status: status,
-      [],
-      .totalCount +| [
-        .nodes(
-          .status +| [
-            .errorReason,
-            .project(
-              .id +| [
-                .name,
-                .slug
-              ]
-            )
-          ]
-        )
-      ]
+  return GraphUser.baseQueryProperties
+    .op(
+      Query.User.backings(
+        status: status,
+        [],
+        .totalCount +| [
+          .nodes(
+            GraphBacking.baseQueryProperties
+              .op(
+                .errorReason +| [
+                  .project(
+                    GraphProject.baseQueryProperties
+                      .op(
+                        .finalCollectionDate +| []
+                      )
+                  )
+                ]
+              )
+          )
+        ]
+      ) +| []
     )
-  ]
 }

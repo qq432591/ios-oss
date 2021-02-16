@@ -41,7 +41,6 @@ final class UpdatePreviewViewModelTests: TestCase {
     )
 
     let redirectUrl = "https://www.kickstarter.com/projects/smashmouth/somebody-once-told-me/posts/1"
-    // swiftlint:disable:next force_unwrapping
     let request = URLRequest(url: URL(string: redirectUrl)!)
     let navigationAction = WKNavigationActionData(
       navigationType: .other,
@@ -94,10 +93,8 @@ final class UpdatePreviewViewModelTests: TestCase {
       self.goToUpdateProject.assertValues([project])
       self.showPublishFailure.assertValueCount(0)
 
-      XCTAssertEqual(
-        ["Triggered Publish Confirmation Modal", "Confirmed Publish", "Published Update", "Update Published"],
-        trackingClient.events, "Koala event is tracked."
-      )
+      XCTAssertEqual([], self.dataLakeTrackingClient.events)
+      XCTAssertEqual([], self.segmentTrackingClient.events)
     }
   }
 
@@ -123,17 +120,13 @@ final class UpdatePreviewViewModelTests: TestCase {
       self.goToUpdate.assertValues([])
       self.goToUpdateProject.assertValues([])
 
-      self.vm.inputs.publishCancelButtonTapped()
-
       self.scheduler.advance()
 
       self.goToUpdate.assertValues([])
       self.goToUpdateProject.assertValues([])
 
-      XCTAssertEqual(
-        ["Triggered Publish Confirmation Modal", "Canceled Publish"],
-        trackingClient.events, "Koala event is tracked."
-      )
+      XCTAssertEqual([], self.dataLakeTrackingClient.events)
+      XCTAssertEqual([], self.segmentTrackingClient.events)
     }
   }
 
@@ -158,11 +151,9 @@ final class UpdatePreviewViewModelTests: TestCase {
 
       self.goToUpdate.assertValues([])
       self.showPublishFailure.assertValueCount(1)
-    }
 
-    XCTAssertEqual(
-      ["Triggered Publish Confirmation Modal", "Confirmed Publish"],
-      trackingClient.events, "Koala event is not tracked."
-    )
+      XCTAssertEqual([], self.dataLakeTrackingClient.events)
+      XCTAssertEqual([], self.segmentTrackingClient.events)
+    }
   }
 }

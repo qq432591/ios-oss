@@ -76,6 +76,7 @@ final class PersonalizationCell: UITableViewCell, ValueCell {
 
     _ = self
       |> baseTableViewCellStyle()
+      |> \.backgroundColor .~ discoveryPageBackgroundColor()
       |> \.accessibilityElements .~ [self.containerView, self.dismissButton]
       |> PersonalizationCell.lens.contentView.layoutMargins %~~ { _, cell in
         cell.traitCollection.isRegularRegular
@@ -176,21 +177,15 @@ private let containerViewStyle: ViewStyle = { view in
     |> \.backgroundColor .~ .ksr_trust_700
     |> \.isAccessibilityElement .~ true
     |> \.accessibilityTraits .~ [UIAccessibilityTraits.button]
-    |> \.accessibilityLabel %~ { _ in localizedString(
-      key: "Well_help_you_find_a_project_to_back",
-      defaultValue: "We'll help you find a project to back."
-    ) }
-    |> \.accessibilityHint %~ { _ in localizedString(
-      key: "See_our_suggestions",
-      defaultValue: "See our suggestions"
-    ) }
+    |> \.accessibilityLabel %~ { _ in Strings.Well_help_you_find_a_project_to_back() }
+    |> \.accessibilityHint %~ { _ in Strings.See_our_suggestions() }
 }
 
 private let baseLabelStyle: LabelStyle = { label in
   label
     |> \.lineBreakMode .~ .byWordWrapping
     |> \.numberOfLines .~ 0
-    |> \.textColor .~ .white
+    |> \.textColor .~ .ksr_white
     |> \.textAlignment .~ .center
 }
 
@@ -209,21 +204,18 @@ private let imageRightStyle: ImageViewStyle = { imageView in
 private let titleLabelStyle: LabelStyle = { label in
   label
     |> \.font .~ UIFont.ksr_title3().bolded
-    |> \.text %~ { _ in localizedString(
-      key: "Well_help_you_find_a_project_to_back",
-      defaultValue: "We'll help you find a project to back."
-    ) }
+    |> \.text %~ { _ in Strings.Well_help_you_find_a_project_to_back() }
 }
 
 private let subtitleLabelStyle: LabelStyle = { label in
   label
     |> \.font .~ UIFont.ksr_body()
-    |> \.text %~ { _ in localizedString(key: "See_our_suggestions", defaultValue: "See our suggestions >") }
+    |> \.text %~ { _ in Strings.See_our_suggestions() }
 }
 
 private let dismissButtonStyle: ButtonStyle = { button in
   button
-    |> \.tintColor .~ UIColor.white
+    |> \.tintColor .~ UIColor.ksr_white
     |> UIButton.lens.image(for: .normal) .~ image(named: "icon--cross")
     |> UIButton.lens.accessibilityLabel %~ { _ in Strings.Dismiss() }
 }

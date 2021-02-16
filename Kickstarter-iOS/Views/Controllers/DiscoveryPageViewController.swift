@@ -23,8 +23,6 @@ internal final class DiscoveryPageViewController: UITableViewController {
   fileprivate var emptyStatesController: EmptyStatesViewController?
   private lazy var headerLabel = { UILabel(frame: .zero) }()
   private var onboardingCompletedObserver: Any?
-  private var optimizelyConfiguredObserver: Any?
-  internal var preferredBackgroundColor: UIColor?
   private var sessionEndedObserver: Any?
   private var sessionStartedObserver: Any?
 
@@ -40,6 +38,7 @@ internal final class DiscoveryPageViewController: UITableViewController {
     self.tableView.register(nib: Nib.DiscoveryPostcardCell)
     self.tableView.registerCellClass(DiscoveryEditorialCell.self)
     self.tableView.registerCellClass(PersonalizationCell.self)
+    self.tableView.registerCellClass(DiscoveryProjectCardCell.self)
 
     self.tableView.dataSource = self.dataSource
 
@@ -54,11 +53,6 @@ internal final class DiscoveryPageViewController: UITableViewController {
     self.onboardingCompletedObserver = NotificationCenter.default
       .addObserver(forName: .ksr_onboardingCompleted, object: nil, queue: nil) { [weak self] _ in
         self?.viewModel.inputs.onboardingCompleted()
-      }
-
-    self.optimizelyConfiguredObserver = NotificationCenter.default
-      .addObserver(forName: .ksr_optimizelyClientConfigured, object: nil, queue: nil) { [weak self] _ in
-        self?.viewModel.inputs.optimizelyClientConfigured()
       }
 
     self.sessionStartedObserver = NotificationCenter.default
@@ -104,8 +98,7 @@ internal final class DiscoveryPageViewController: UITableViewController {
       self.sessionStartedObserver,
       self.currentEnvironmentChangedObserver,
       self.configUpdatedObserver,
-      self.onboardingCompletedObserver,
-      self.optimizelyConfiguredObserver
+      self.onboardingCompletedObserver
     ].forEach { $0.doIfSome(NotificationCenter.default.removeObserver) }
   }
 
@@ -136,13 +129,15 @@ internal final class DiscoveryPageViewController: UITableViewController {
   internal override func bindStyles() {
     super.bindStyles()
 
-    _ = self
-      |> baseTableControllerStyle(estimatedRowHeight: 200.0)
+    _ = self.tableView
+      |> \.rowHeight .~ UITableView.automaticDimension
+      |> \.estimatedRowHeight .~ 200.0
 
-    if let preferredBackgroundColor = self.preferredBackgroundColor {
-      _ = self
-        |> \.view.backgroundColor .~ preferredBackgroundColor
-    }
+    _ = self.view
+      |> \.backgroundColor .~ (
+        // Update the background if it is not currently clear (contained in EditorialProjectsViewController)
+        self.view.backgroundColor != .clear ? discoveryPageBackgroundColor() : self.view.backgroundColor
+      )
 
     _ = self.headerLabel
       |> headerLabelStyle
@@ -198,8 +193,8 @@ internal final class DiscoveryPageViewController: UITableViewController {
 
     self.viewModel.outputs.projectsLoaded
       .observeForUI()
-      .observeValues { [weak self] projects, params in
-        self?.dataSource.load(projects: projects, params: params)
+      .observeValues { [weak self] projects, params, variant in
+        self?.dataSource.load(projects: projects, params: params, projectCardVariant: variant)
         self?.tableView.reloadData()
         self?.updateProjectPlaylist(projects)
       }
@@ -304,20 +299,25 @@ internal final class DiscoveryPageViewController: UITableViewController {
         self.delegate?.discoverPageViewController(self, contentOffsetDidChangeTo: offset)
       }
 
-    self.viewModel.outputs.configureEditorialTableViewHeader
-      .observeForUI()
-      .observeValues { [weak self] title in
-        self?.configureHeaderView(with: title)
-      }
-
     self.viewModel.outputs.goToLoginSignup
       .observeForControllerAction()
       .observeValues { [weak self] intent in
         let loginTout = LoginToutViewController.configuredWith(loginIntent: intent)
+
+        let isIpad = AppEnvironment.current.device.userInterfaceIdiom == .pad
         let nav = UINavigationController(rootViewController: loginTout)
-        nav.modalPresentationStyle = .formSheet
+          |> \.modalPresentationStyle .~ (isIpad ? .formSheet : .fullScreen)
 
         self?.present(nav, animated: true, completion: nil)
+      }
+
+    self.viewModel.outputs.contentInset
+      .observeForUI()
+      .observeValues { [weak self] inset in
+        guard let self = self else { return }
+
+        _ = self.tableView
+          |> \.contentInset .~ inset
       }
   }
 
@@ -340,6 +340,9 @@ internal final class DiscoveryPageViewController: UITableViewController {
       cell.delegate = self
     } else if let cell = cell as? PersonalizationCell {
       cell.delegate = self
+    } else if let cell = cell as? DiscoveryProjectCardCell {
+      cell.delegate = self
+      cell.layoutIfNeeded()
     }
 
     self.viewModel.inputs.willDisplayRow(
@@ -361,48 +364,7 @@ internal final class DiscoveryPageViewController: UITableViewController {
 
   // MARK: - Functions
 
-  private func configureHeaderView(with title: String) {
-    let headerContainer = UIView(frame: .zero)
-      |> \.backgroundColor .~ .white
-      |> \.accessibilityLabel .~ title
-      |> \.accessibilityTraits .~ .header
-      |> \.isAccessibilityElement .~ true
-      |> \.layoutMargins %~~ { _, _ in
-        self.view.traitCollection.isRegularRegular
-          ? .init(top: Styles.grid(4), left: Styles.grid(30), bottom: Styles.grid(2), right: Styles.grid(30))
-          : .init(top: Styles.grid(4), left: Styles.grid(2), bottom: Styles.grid(2), right: Styles.grid(2))
-      }
-
-    _ = self.headerLabel
-      |> \.text .~ title
-
-    _ = (self.headerLabel, headerContainer)
-      |> ksr_addSubviewToParent()
-
-    self.tableView.tableHeaderView = headerContainer
-
-    _ = (self.headerLabel, headerContainer)
-      |> ksr_constrainViewToMarginsInParent()
-
-    let widthConstraint = self.headerLabel.widthAnchor.constraint(equalTo: self.tableView.widthAnchor)
-      |> \.priority .~ .defaultHigh
-
-    NSLayoutConstraint.activate([widthConstraint])
-  }
-
   fileprivate func showShareSheet(_ controller: UIActivityViewController, shareContextView: UIView?) {
-    controller.completionWithItemsHandler = { [weak self] activityType, completed, returnedItems, error in
-
-      self?.shareViewModel.inputs.shareActivityCompletion(
-        with: .init(
-          activityType: activityType,
-          completed: completed,
-          returnedItems: returnedItems,
-          activityError: error
-        )
-      )
-    }
-
     if UIDevice.current.userInterfaceIdiom == .pad {
       controller.modalPresentationStyle = .popover
       let popover = controller.popoverPresentationController
@@ -420,6 +382,9 @@ internal final class DiscoveryPageViewController: UITableViewController {
 
   fileprivate func goTo(project: Project, refTag: RefTag) {
     let vc = ProjectNavigatorViewController.configuredWith(project: project, refTag: refTag)
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      vc.modalPresentationStyle = .fullScreen
+    }
     self.present(vc, animated: true, completion: nil)
   }
 
@@ -430,6 +395,9 @@ internal final class DiscoveryPageViewController: UITableViewController {
       initialPlaylist: initialPlaylist,
       navigatorDelegate: self
     )
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      vc.modalPresentationStyle = .fullScreen
+    }
     self.present(vc, animated: true, completion: nil)
   }
 
@@ -559,8 +527,9 @@ extension DiscoveryPageViewController: DiscoveryPostcardCellDelegate {
 
   internal func discoveryPostcardCellGoToLoginTout() {
     let vc = LoginToutViewController.configuredWith(loginIntent: .starProject)
+    let isIpad = AppEnvironment.current.device.userInterfaceIdiom == .pad
     let nav = UINavigationController(rootViewController: vc)
-    nav.modalPresentationStyle = .formSheet
+      |> \.modalPresentationStyle .~ (isIpad ? .formSheet : .fullScreen)
 
     self.present(nav, animated: true, completion: nil)
   }

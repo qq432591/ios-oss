@@ -4,16 +4,27 @@ import Prelude
 import Stripe
 import UIKit
 
+private enum Layout {
+  enum Style {
+    static let cornerRadius: CGFloat = Styles.grid(2)
+  }
+
+  enum Margin {
+    static let topBottom: CGFloat = Styles.grid(3)
+    static let leftRight: CGFloat = CheckoutConstants.PledgeView.Inset.leftRight
+  }
+}
+
 protocol PledgeViewControllerDelegate: AnyObject {
   func pledgeViewControllerDidUpdatePledge(_ viewController: PledgeViewController, message: String)
 }
 
-final class PledgeViewController: UIViewController, MessageBannerViewControllerPresenting {
+final class PledgeViewController: UIViewController,
+  MessageBannerViewControllerPresenting, ProcessingViewPresenting {
   // MARK: - Properties
 
-  private lazy var confirmationLabel: UILabel = { UILabel(frame: .zero) }()
   private lazy var confirmationSectionViews = {
-    [self.submitButton, self.confirmationLabel]
+    [self.pledgeDisclaimerView]
   }()
 
   public weak var delegate: PledgeViewControllerDelegate?
@@ -22,6 +33,8 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
     UIView(frame: .zero)
       |> \.translatesAutoresizingMaskIntoConstraints .~ false
   }()
+
+  private lazy var projectTitleLabel = UILabel(frame: .zero)
 
   private lazy var sectionSeparatorViews = {
     [self.descriptionSectionSeparator, self.summarySectionSeparator]
@@ -37,24 +50,36 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
       |> \.delegate .~ self
   }()
 
-  private lazy var continueViewController = {
-    PledgeContinueViewController.instantiate()
+  internal var processingView: ProcessingView? = ProcessingView(frame: .zero)
+  private lazy var pledgeDisclaimerView: PledgeDisclaimerView = {
+    PledgeDisclaimerView(frame: .zero)
+      |> \.translatesAutoresizingMaskIntoConstraints .~ false
+      |> \.delegate .~ self
   }()
 
   private lazy var descriptionSectionViews = {
-    [self.descriptionViewController.view, self.descriptionSectionSeparator]
+    [self.projectTitleLabel, self.descriptionSectionSeparator]
   }()
 
-  private lazy var descriptionViewController = {
-    PledgeDescriptionViewController.instantiate()
+  private lazy var pledgeExpandableRewardsHeaderViewController = {
+    PledgeExpandableRewardsHeaderViewController(nibName: nil, bundle: nil)
+      |> \.animatingViewDelegate .~ self.view
   }()
 
   private lazy var inputsSectionViews = {
-    [self.pledgeAmountViewController.view, self.shippingLocationViewController.view]
+    [
+      self.shippingLocationViewController.view,
+      self.shippingSummaryView,
+      self.pledgeAmountViewController.view
+    ]
   }()
 
-  private lazy var loginSectionViews = {
-    [self.continueViewController.view]
+  fileprivate lazy var keyboardDimissingTapGestureRecognizer: UITapGestureRecognizer = {
+    UITapGestureRecognizer(
+      target: self,
+      action: #selector(PledgeViewController.dismissKeyboard)
+    )
+      |> \.cancelsTouchesInView .~ false
   }()
 
   internal var messageBannerViewController: MessageBannerViewController?
@@ -78,12 +103,13 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
       |> \.delegate .~ self
   }()
 
-  private lazy var submitButton: LoadingButton = { LoadingButton(type: .custom) }()
+  private lazy var shippingSummaryView: PledgeShippingSummaryView = {
+    PledgeShippingSummaryView(frame: .zero)
+  }()
 
   private lazy var summarySectionViews = {
     [
       self.summarySectionSeparator,
-      self.pledgeAmountSummaryViewController.view,
       self.summaryViewController.view
     ]
   }()
@@ -92,8 +118,23 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
     PledgeSummaryViewController.instantiate()
   }()
 
-  private lazy var rootScrollView: UIScrollView = { UIScrollView(frame: .zero) }()
+  private lazy var pledgeCTAContainerView: PledgeViewCTAContainerView = {
+    PledgeViewCTAContainerView(frame: .zero)
+      |> \.translatesAutoresizingMaskIntoConstraints .~ false
+      |> \.delegate .~ self
+  }()
+
+  private lazy var rootScrollView: UIScrollView = {
+    UIScrollView(frame: .zero)
+      |> \.translatesAutoresizingMaskIntoConstraints .~ false
+  }()
+
   private lazy var rootStackView: UIStackView = {
+    UIStackView(frame: .zero)
+      |> \.translatesAutoresizingMaskIntoConstraints .~ false
+  }()
+
+  private lazy var rootInsetStackView: UIStackView = {
     UIStackView(frame: .zero)
       |> \.translatesAutoresizingMaskIntoConstraints .~ false
   }()
@@ -103,8 +144,8 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
 
   // MARK: - Lifecycle
 
-  func configureWith(project: Project, reward: Reward, refTag: RefTag?, context: PledgeViewContext) {
-    self.viewModel.inputs.configureWith(project: project, reward: reward, refTag: refTag, context: context)
+  func configure(with data: PledgeViewData) {
+    self.viewModel.inputs.configure(with: data)
   }
 
   override func viewDidLoad() {
@@ -115,25 +156,10 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
 
     self.messageBannerViewController = self.configureMessageBannerViewController(on: self)
 
-    _ = (self.rootScrollView, self.view)
-      |> ksr_addSubviewToParent()
-      |> ksr_constrainViewToEdgesInParent()
-
-    _ = (self.rootStackView, self.rootScrollView)
-      |> ksr_addSubviewToParent()
-      |> ksr_constrainViewToEdgesInParent()
-
-    self.view.addGestureRecognizer(
-      UITapGestureRecognizer(target: self, action: #selector(PledgeViewController.dismissKeyboard))
-    )
-
-    self.submitButton.addTarget(
-      self,
-      action: #selector(PledgeViewController.submitButtonTapped),
-      for: .touchUpInside
-    )
+    self.view.addGestureRecognizer(self.keyboardDimissingTapGestureRecognizer)
 
     self.configureChildViewControllers()
+    self.configureDisclaimerView()
     self.setupConstraints()
 
     self.viewModel.inputs.viewDidLoad()
@@ -146,38 +172,38 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
   // MARK: - Configuration
 
   private func configureChildViewControllers() {
+    _ = (self.rootScrollView, self.view)
+      |> ksr_addSubviewToParent()
+
+    _ = (self.rootStackView, self.rootScrollView)
+      |> ksr_addSubviewToParent()
+      |> ksr_constrainViewToEdgesInParent()
+
+    _ = (self.pledgeCTAContainerView, self.view)
+      |> ksr_addSubviewToParent()
+
     let childViewControllers = [
-      self.descriptionViewController,
-      self.pledgeAmountViewController,
+      self.pledgeExpandableRewardsHeaderViewController,
       self.pledgeAmountSummaryViewController,
+      self.pledgeAmountViewController,
       self.shippingLocationViewController,
       self.summaryViewController,
-      self.continueViewController,
       self.paymentMethodsViewController
     ]
 
-    let topSectionViews = [
-      self.descriptionSectionViews,
-      self.inputsSectionViews,
-      self.summarySectionViews,
-      self.loginSectionViews
+    let arrangedSubviews = [
+      self.pledgeExpandableRewardsHeaderViewController.view,
+      self.rootInsetStackView
     ]
-    .flatMap { $0 }
     .compact()
 
-    let topSectionStackView = UIStackView(arrangedSubviews: topSectionViews)
-      |> nestedStackViewStyle
-
-    let bottomSectionViews = [self.confirmationSectionViews]
-      .flatMap { $0 }
-
-    let bottomSectionStackView = UIStackView(arrangedSubviews: bottomSectionViews)
-      |> bottomStackViewStyle
-
-    let arrangedSubviews = [
-      [topSectionStackView],
+    let arrangedInsetSubviews = [
+      self.descriptionSectionViews,
+      [self.pledgeAmountSummaryViewController.view],
+      self.inputsSectionViews,
+      self.summarySectionViews,
       self.paymentMethodsSectionViews,
-      [bottomSectionStackView]
+      self.confirmationSectionViews
     ]
     .flatMap { $0 }
     .compact()
@@ -186,19 +212,29 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
       self.rootStackView.addArrangedSubview(view)
     }
 
-    _ = (self.paymentMethodsViewController.view, self.rootStackView)
-      |> ksr_setCustomSpacing(Styles.grid(2))
+    arrangedInsetSubviews.forEach { view in
+      self.rootInsetStackView.addArrangedSubview(view)
+    }
 
     childViewControllers.forEach { viewController in
       self.addChild(viewController)
       viewController.didMove(toParent: self)
     }
+
+    self.rootStackView
+      .setCustomSpacing(Styles.grid(2), after: self.pledgeExpandableRewardsHeaderViewController.view)
   }
 
   private func setupConstraints() {
     NSLayoutConstraint.activate([
-      self.rootStackView.widthAnchor.constraint(equalTo: self.rootScrollView.widthAnchor),
-      self.submitButton.heightAnchor.constraint(greaterThanOrEqualToConstant: Styles.minTouchSize.height)
+      self.rootScrollView.topAnchor.constraint(equalTo: self.view.topAnchor),
+      self.rootScrollView.leftAnchor.constraint(equalTo: self.view.leftAnchor),
+      self.rootScrollView.rightAnchor.constraint(equalTo: self.view.rightAnchor),
+      self.rootScrollView.bottomAnchor.constraint(equalTo: self.pledgeCTAContainerView.topAnchor),
+      self.pledgeCTAContainerView.leftAnchor.constraint(equalTo: self.view.leftAnchor),
+      self.pledgeCTAContainerView.rightAnchor.constraint(equalTo: self.view.rightAnchor),
+      self.pledgeCTAContainerView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+      self.rootStackView.widthAnchor.constraint(equalTo: self.view.widthAnchor)
     ])
 
     self.sectionSeparatorViews.forEach { view in
@@ -217,21 +253,26 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
     _ = self.view
       |> checkoutBackgroundStyle
 
+    _ = self.pledgeDisclaimerView
+      |> pledgeDisclaimerViewStyle
+
+    _ = self.projectTitleLabel
+      |> projectTitleLabelStyle
+
     _ = self.rootScrollView
       |> rootScrollViewStyle
 
     _ = self.rootStackView
       |> rootStackViewStyle
 
+    _ = self.rootInsetStackView
+      |> rootInsetStackViewStyle
+
     _ = self.sectionSeparatorViews
       ||> separatorStyleDark
 
-    _ = self.submitButton
-      |> greenButtonStyle
-
-    _ = self.confirmationLabel
-      |> \.numberOfLines .~ 0
-      |> checkoutBackgroundStyle
+    _ = self.paymentMethodsViewController.view
+      |> roundedStyle(cornerRadius: Layout.Style.cornerRadius)
   }
 
   // MARK: - View model
@@ -252,31 +293,63 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
         STPPaymentConfiguration.shared().appleMerchantIdentifier = merchantIdentifier
       }
 
-    self.viewModel.outputs.configureWithData
+    self.viewModel.outputs.configureShippingLocationViewWithData
       .observeForUI()
       .observeValues { [weak self] data in
-        self?.continueViewController.configureWith(value: data)
-        self?.descriptionViewController.configureWith(value: data)
-        self?.pledgeAmountViewController.configureWith(value: data)
-        self?.pledgeAmountSummaryViewController.configureWith(data.project)
         self?.shippingLocationViewController.configureWith(value: data)
       }
 
-    self.viewModel.outputs.notifyPledgeAmountViewControllerShippingAmountChanged
+    self.viewModel.outputs.configureShippingSummaryViewWithData
+      .observeForUI()
+      .observeValues { [weak self] data in
+        self?.shippingSummaryView.configure(with: data)
+      }
+
+    self.viewModel.outputs.configurePledgeAmountViewWithData
+      .observeForUI()
+      .observeValues { [weak self] data in
+        self?.pledgeAmountViewController.configureWith(value: data)
+      }
+
+    self.viewModel.outputs.configureExpandableRewardsHeaderWithData
+      .observeForUI()
+      .observeValues { [weak self] data in
+        self?.pledgeExpandableRewardsHeaderViewController.configure(with: data)
+      }
+
+    self.viewModel.outputs.configurePledgeAmountSummaryViewControllerWithData
+      .observeForUI()
+      .observeValues { [weak self] data in
+        self?.pledgeAmountSummaryViewController.configureWith(data)
+      }
+
+    self.viewModel.outputs.configurePledgeViewCTAContainerView
+      .observeForUI()
+      .observeValues { [weak self] value in
+        self?.pledgeCTAContainerView.configureWith(value: value)
+      }
+
+    self.viewModel.outputs.notifyPledgeAmountViewControllerUnavailableAmountChanged
       .observeForUI()
       .observeValues { [weak self] amount in
-        self?.pledgeAmountViewController.selectedShippingAmountChanged(to: amount)
+        self?.pledgeAmountViewController.unavailableAmountChanged(to: amount)
       }
 
     self.viewModel.outputs.configureSummaryViewControllerWithData
       .observeForUI()
-      .observeValues { [weak self] project, pledgeTotal in
-        self?.summaryViewController.configureWith(project, total: pledgeTotal)
+      .observeValues { [weak self] data in
+        self?.summaryViewController.configure(with: data)
       }
     self.viewModel.outputs.configurePaymentMethodsViewControllerWithValue
       .observeForUI()
       .observeValues { [weak self] value in
         self?.paymentMethodsViewController.configure(with: value)
+      }
+
+    self.viewModel.outputs.goToLoginSignup
+      .observeForControllerAction()
+      .observeValues { [weak self] intent, project, reward in
+        self?.goToLoginSignup(with: intent, project: project, reward: reward)
       }
 
     self.sessionStartedObserver = NotificationCenter.default
@@ -316,26 +389,27 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
         self?.rootScrollView.handleKeyboardVisibilityDidChange(change)
       }
 
-    self.viewModel.outputs.sectionSeparatorsHidden
-      .observeForUI()
-      .observeValues { [weak self] hidden in self?.sectionSeparatorViews.forEach { $0.isHidden = hidden } }
+    self.projectTitleLabel.rac.text = self.viewModel.outputs.projectTitle
+    self.projectTitleLabel.rac.hidden = self.viewModel.outputs.projectTitleLabelHidden
+    self.descriptionSectionSeparator.rac.hidden = self.viewModel.outputs.descriptionSectionSeparatorHidden
+    self.summarySectionSeparator.rac.hidden = self.viewModel.outputs.summarySectionSeparatorHidden
 
-    self.descriptionViewController.view.rac.hidden = self.viewModel.outputs.descriptionViewHidden
+    self.viewModel.outputs.rootStackViewLayoutMargins
+      .observeForUI()
+      .observeValues { [weak self] margins in
+        self?.rootStackView.layoutMargins = margins
+      }
 
     self.shippingLocationViewController.view.rac.hidden
       = self.viewModel.outputs.shippingLocationViewHidden
-    self.continueViewController.view.rac.hidden = self.viewModel.outputs.continueViewHidden
+    self.shippingSummaryView.rac.hidden
+      = self.viewModel.outputs.shippingSummaryViewHidden
     self.paymentMethodsViewController.view.rac.hidden = self.viewModel.outputs.paymentMethodsViewHidden
     self.pledgeAmountViewController.view.rac.hidden = self.viewModel.outputs.pledgeAmountViewHidden
     self.pledgeAmountSummaryViewController.view.rac.hidden
       = self.viewModel.outputs.pledgeAmountSummaryViewHidden
-
-    self.submitButton.rac.enabled = self.viewModel.outputs.submitButtonEnabled
-    self.submitButton.rac.hidden = self.viewModel.outputs.submitButtonHidden
-    self.submitButton.rac.title = self.viewModel.outputs.submitButtonTitle
-    self.confirmationLabel.rac.hidden = self.viewModel.outputs.confirmationLabelHidden
-
-    self.confirmationLabel.rac.attributedText = self.viewModel.outputs.confirmationLabelAttributedText
+    self.pledgeExpandableRewardsHeaderViewController.view.rac.hidden
+      = self.viewModel.outputs.expandableRewardsHeaderViewHidden
 
     self.viewModel.outputs.title
       .observeForUI()
@@ -346,10 +420,21 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
           |> \.title %~ { _ in title }
       }
 
-    self.viewModel.outputs.submitButtonIsLoading
+    self.viewModel.outputs.processingViewIsHidden
       .observeForUI()
-      .observeValues { [weak self] isLoading in
-        self?.submitButton.isLoading = isLoading
+      .observeValues { [weak self] isHidden in
+        if isHidden {
+          self?.hideProcessingView()
+        } else {
+          self?.showProcessingView()
+        }
+      }
+
+    self.viewModel.outputs.showWebHelp
+      .observeForControllerAction()
+      .observeValues { [weak self] helpType in
+        guard let self = self else { return }
+        self.presentHelpWebViewController(with: helpType, presentationStyle: .formSheet)
       }
 
     // MARK: Errors
@@ -372,8 +457,9 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
       .paymentRequest(
         for: paymentAuthorizationData.project,
         reward: paymentAuthorizationData.reward,
-        pledgeAmount: paymentAuthorizationData.pledgeAmount,
-        selectedShippingRule: paymentAuthorizationData.selectedShippingRule,
+        allRewardsTotal: paymentAuthorizationData.allRewardsTotal,
+        additionalPledgeAmount: paymentAuthorizationData.additionalPledgeAmount,
+        allRewardsShippingTotal: paymentAuthorizationData.allRewardsShippingTotal,
         merchantIdentifier: paymentAuthorizationData.merchantIdentifier
       )
 
@@ -396,12 +482,32 @@ final class PledgeViewController: UIViewController, MessageBannerViewControllerP
 
   // MARK: - Actions
 
-  @objc private func submitButtonTapped() {
-    self.viewModel.inputs.submitButtonTapped()
-  }
-
   @objc private func dismissKeyboard() {
     self.view.endEditing(true)
+  }
+
+  // MARK: - Functions
+
+  private func configureDisclaimerView() {
+    guard let attributedText = attributedLearnMoreText() else { return }
+    self.pledgeDisclaimerView.configure(with: ("icon-not-a-store", attributedText))
+  }
+
+  private func goToLoginSignup(with intent: LoginIntent, project: Project, reward: Reward) {
+    let loginSignupViewController = LoginToutViewController.configuredWith(
+      loginIntent: intent,
+      project: project,
+      reward: reward
+    )
+
+    let navigationController = UINavigationController(rootViewController: loginSignupViewController)
+    let navigationBarHeight = navigationController.navigationBar.bounds.height
+
+    if #available(iOS 13.0, *) {
+      self.present(navigationController, animated: true)
+    } else {
+      self.presentViewControllerWithSheetOverlay(navigationController, offset: navigationBarHeight)
+    }
   }
 
   private func beginSCAFlow(withClientSecret secret: String) {
@@ -458,6 +564,26 @@ extension PledgeViewController: PKPaymentAuthorizationViewControllerDelegate {
   }
 }
 
+// MARK: - PledgeScreenCTAContainerViewDelegate
+
+extension PledgeViewController: PledgeViewCTAContainerViewDelegate {
+  func goToLoginSignup() {
+    self.viewModel.inputs.goToLoginSignupTapped()
+  }
+
+  func applePayButtonTapped() {
+    self.viewModel.inputs.applePayButtonTapped()
+  }
+
+  func submitButtonTapped() {
+    self.viewModel.inputs.submitButtonTapped()
+  }
+
+  func termsOfUseTapped(with helpType: HelpType) {
+    self.viewModel.inputs.termsOfUseTapped(with: helpType)
+  }
+}
+
 // MARK: - PledgeAmountViewControllerDelegate
 
 extension PledgeViewController: PledgeAmountViewControllerDelegate {
@@ -478,6 +604,9 @@ extension PledgeViewController: PledgeShippingLocationViewControllerDelegate {
   ) {
     self.viewModel.inputs.shippingRuleSelected(shippingRule)
   }
+
+  func pledgeShippingLocationViewControllerLayoutDidUpdate(_: PledgeShippingLocationViewController) {}
+  func pledgeShippingLocationViewControllerFailedToLoad(_: PledgeShippingLocationViewController) {}
 }
 
 // MARK: - PledgeViewControllerMessageDisplaying
@@ -509,30 +638,93 @@ extension PledgeViewController: PledgePaymentMethodsViewControllerDelegate {
   }
 }
 
-// MARK: - Styles
+// MARK: - PledgeDisclaimerViewDelegate
 
-private let nestedStackViewStyle: StackViewStyle = { stackView in
-  stackView
-    |> checkoutRootStackViewStyle
-    |> \.layoutMargins .~ UIEdgeInsets(leftRight: CheckoutConstants.PledgeView.Inset.leftRight)
+extension PledgeViewController: PledgeDisclaimerViewDelegate {
+  func pledgeDisclaimerView(_: PledgeDisclaimerView, didTapURL _: URL) {
+    self.viewModel.inputs.pledgeDisclaimerViewDidTapLearnMore()
+  }
 }
 
-private let bottomStackViewStyle: StackViewStyle = { stackView in
-  stackView
-    |> verticalStackViewStyle
-    |> \.spacing .~ Styles.grid(2)
-    |> \.isLayoutMarginsRelativeArrangement .~ true
-    |> \.layoutMargins .~ UIEdgeInsets(leftRight: CheckoutConstants.PledgeView.Inset.leftRight)
+// MARK: - Styles
+
+private let pledgeDisclaimerViewStyle: ViewStyle = { view in
+  view
+    |> roundedStyle(cornerRadius: Layout.Style.cornerRadius)
+}
+
+private let projectTitleLabelStyle: LabelStyle = { label in
+  label
+    |> \.font .~ UIFont.ksr_body().bolded
+    |> \.numberOfLines .~ 0
 }
 
 private let rootScrollViewStyle: ScrollStyle = { scrollView in
   scrollView
-    |> UIScrollView.lens.showsVerticalScrollIndicator .~ false
+    |> \.showsVerticalScrollIndicator .~ false
     |> \.alwaysBounceVertical .~ true
 }
 
 private let rootStackViewStyle: StackViewStyle = { stackView in
   stackView
-    |> checkoutRootStackViewStyle
-    |> \.layoutMargins .~ UIEdgeInsets(topBottom: Styles.grid(3))
+    |> \.axis .~ NSLayoutConstraint.Axis.vertical
+    |> \.spacing .~ Styles.grid(4)
+    |> \.isLayoutMarginsRelativeArrangement .~ true
+}
+
+private let rootInsetStackViewStyle: StackViewStyle = { stackView in
+  stackView
+    |> \.axis .~ NSLayoutConstraint.Axis.vertical
+    |> \.spacing .~ Styles.grid(4)
+    |> \.isLayoutMarginsRelativeArrangement .~ true
+    |> \.layoutMargins .~ UIEdgeInsets(
+      topBottom: 0,
+      leftRight: Layout.Margin.leftRight
+    )
+}
+
+// MARK: - Functions
+
+private func attributedLearnMoreText() -> NSAttributedString? {
+  guard let trustLink = HelpType.trust.url(
+    withBaseUrl: AppEnvironment.current.apiService.serverConfig.webBaseUrl
+  )?.absoluteString else { return nil }
+
+  let paragraphStyle = NSMutableParagraphStyle()
+  paragraphStyle.lineSpacing = 2
+
+  let attributedLine1String = Strings.Kickstarter_is_not_a_store()
+    .attributed(
+      with: UIFont.ksr_footnote(),
+      foregroundColor: .ksr_support_400,
+      attributes: [.paragraphStyle: paragraphStyle],
+      bolding: [Strings.Kickstarter_is_not_a_store()]
+    )
+
+  let line2String = Strings.Its_a_way_to_bring_creative_projects_to_life_Learn_more_about_accountability(
+    trust_link: trustLink
+  )
+
+  guard let attributedLine2String = try? NSMutableAttributedString(
+    data: Data(line2String.utf8),
+    options: [
+      .documentType: NSAttributedString.DocumentType.html,
+      .characterEncoding: String.Encoding.utf8.rawValue
+    ],
+    documentAttributes: nil
+  ) else { return nil }
+
+  let attributes: String.Attributes = [
+    .font: UIFont.ksr_footnote(),
+    .foregroundColor: UIColor.ksr_support_400,
+    .paragraphStyle: paragraphStyle,
+    .underlineStyle: 0
+  ]
+
+  let fullRange = (attributedLine2String.string as NSString).range(of: attributedLine2String.string)
+  attributedLine2String.addAttributes(attributes, range: fullRange)
+
+  let attributedString = attributedLine1String + NSAttributedString(string: "\n") + attributedLine2String
+
+  return attributedString
 }

@@ -49,12 +49,6 @@ internal final class PaymentMethodsViewController: UIViewController, MessageBann
     self.viewModel.inputs.viewDidLoad()
   }
 
-  override func viewWillAppear(_ animated: Bool) {
-    super.viewWillAppear(animated)
-
-    self.viewModel.inputs.viewWillAppear()
-  }
-
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
 
@@ -228,6 +222,6 @@ private let tableViewStyle: TableViewStyle = { (tableView: UITableView) in
 private let tableViewSeparatorStyle: TableViewStyle = { tableView in
   tableView
     |> \.separatorStyle .~ .singleLine
-    |> \.separatorColor .~ .ksr_grey_500
+    |> \.separatorColor .~ .ksr_support_300
     |> \.separatorInset .~ .init(left: Styles.grid(2))
 }

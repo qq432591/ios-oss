@@ -159,21 +159,27 @@ public final class RootViewModel: RootViewModelType, RootViewModelInputs, RootVi
       self.userSessionEndedProperty.signal,
       self.currentUserUpdatedProperty.signal
     )
-    .map { AppEnvironment.current.currentUser }
+    .map { _ in AppEnvironment.current.currentUser }
 
     let userState: Signal<(isLoggedIn: Bool, isMember: Bool), Never> = currentUser
       .map { ($0 != nil, ($0?.stats.memberProjectsCount ?? 0) > 0) }
       .skipRepeats(==)
 
-    let standardViewControllers = self.viewDidLoadProperty.signal.map { generateStandardViewControllers() }
-    let personalizedViewControllers = userState.map { generatePersonalizedViewControllers(userState: $0) }
+    let standardViewControllers = self.viewDidLoadProperty.signal.map { _ -> [RootViewControllerData] in
+      generateStandardViewControllers()
+    }
+    let personalizedViewControllers = userState.map { userState -> [RootViewControllerData] in
+      generatePersonalizedViewControllers(userState: (userState.isMember, userState.isLoggedIn))
+    }
 
     let viewControllers = Signal.combineLatest(standardViewControllers, personalizedViewControllers).map(+)
 
     let refreshedViewControllers = userState.takeWhen(self.userLocalePreferencesChangedProperty.signal)
       .map { userState -> [RootViewControllerData] in
         let standard = generateStandardViewControllers()
-        let personalized = generatePersonalizedViewControllers(userState: userState)
+        let personalized = generatePersonalizedViewControllers(
+          userState: (userState.isMember, userState.isLoggedIn)
+        )
 
         return standard + personalized
       }
@@ -255,7 +261,8 @@ public final class RootViewModel: RootViewModelType, RootViewModelInputs, RootVi
     )
 
     let badgeValueOnUserUpdated = self.currentUserUpdatedProperty.signal
-      .map { _ in AppEnvironment.current.currentUser?.unseenActivityCount }
+      .map { _ in currentUserActivitiesAndErroredPledgeCount() }
+      .wrapInOptional()
 
     let updateBadgeValueFromNotification = selectedIndexAndActivityViewControllerIndex
       .takePairWhen(self.didReceiveBadgeValueSignal)
@@ -279,7 +286,9 @@ public final class RootViewModel: RootViewModelType, RootViewModelInputs, RootVi
     let clearBadgeValueOnActivitiesTabSelected = selectedIndexAndActivityViewControllerIndex.filter(==)
       .flatMap { _, index in currentBadgeValue.producer.map { ($0, index) }.take(first: 1) }
       .filter { value, _ in value != nil }
-      .map { _, index -> (Int?, RootViewControllerIndex) in (nil, index) }
+      .map { _, index -> (Int?, RootViewControllerIndex) in
+        (AppEnvironment.current.currentUser?.erroredBackingsCount, index)
+      }
 
     let integerBadgeValueAndIndex = Signal.merge(
       updateBadgeValueOnLifecycleEvents,
@@ -320,16 +329,16 @@ public final class RootViewModel: RootViewModelType, RootViewModelInputs, RootVi
     .map(first)
     .map(tabData(forUser:))
 
-    // MARK: - Koala
+    // MARK: - KSRAnalytics
 
     self.tabBarItemsData
       .takePairWhen(self.didSelectIndexProperty.signal)
-      .filterMap { data, index in
+      .compactMap { data, index in
         guard index < data.items.count else { return nil }
 
         return tabBarItemLabel(for: data.items[index])
       }.observeValues { tabBarItemLabel in
-        AppEnvironment.current.koala.trackTabBarClicked(tabBarItemLabel)
+        AppEnvironment.current.ksrAnalytics.trackTabBarClicked(tabBarItemLabel)
       }
   }
 
@@ -427,6 +436,11 @@ public final class RootViewModel: RootViewModelType, RootViewModelInputs, RootVi
   public var outputs: RootViewModelOutputs { return self }
 }
 
+private func currentUserActivitiesAndErroredPledgeCount() -> Int {
+  (AppEnvironment.current.currentUser?.unseenActivityCount ?? 0) +
+    (AppEnvironment.current.currentUser?.erroredBackingsCount ?? 0)
+}
+
 private func generateStandardViewControllers() -> [RootViewControllerData] {
   return [.discovery, .activities, .search]
 }
@@ -472,7 +486,7 @@ private func activitiesBadgeValue(with value: Int?) -> String? {
     : "\(clampedBadgeValue)"
 }
 
-private func tabBarItemLabel(for tabBarItem: TabBarItem) -> Koala.TabBarItemLabel {
+private func tabBarItemLabel(for tabBarItem: TabBarItem) -> KSRAnalytics.TabBarItemLabel {
   switch tabBarItem {
   case .activity:
     return .activity

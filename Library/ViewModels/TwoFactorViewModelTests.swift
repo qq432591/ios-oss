@@ -2,7 +2,6 @@
 @testable import Library
 import ReactiveExtensions_TestHelpers
 import ReactiveSwift
-// swiftlint:disable force_unwrapping
 import XCTest
 
 final class TwoFactorViewModelTests: TestCase {
@@ -280,6 +279,7 @@ final class TwoFactorViewModelTests: TestCase {
     self.vm.inputs.viewDidLoad()
     self.vm.inputs.viewWillAppear()
 
-    XCTAssertEqual(["Two-Factor Confirmation Viewed"], self.trackingClient.events)
+    XCTAssertEqual(["Two-Factor Confirmation Viewed"], self.dataLakeTrackingClient.events)
+    XCTAssertEqual(["Two-Factor Confirmation Viewed"], self.segmentTrackingClient.events)
   }
 }

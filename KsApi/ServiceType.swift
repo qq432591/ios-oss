@@ -1,4 +1,5 @@
 import Foundation
+import PerimeterX
 import Prelude
 import ReactiveSwift
 
@@ -43,10 +44,6 @@ public protocol ServiceType {
   func addImage(file fileURL: URL, toDraft draft: UpdateDraft)
     -> SignalProducer<UpdateDraft.Image, ErrorEnvelope>
 
-  /// Uploads and attaches a video to the draft of a project update.
-  func addVideo(file fileURL: URL, toDraft draft: UpdateDraft)
-    -> SignalProducer<UpdateDraft.Video, ErrorEnvelope>
-
   /// Cancels a backing
   func cancelBacking(input: CancelBackingInput)
     -> SignalProducer<GraphMutationEmptyResponseEnvelope, GraphError>
@@ -73,9 +70,6 @@ public protocol ServiceType {
   func addNewCreditCard(input: CreatePaymentSourceInput) ->
     SignalProducer<CreatePaymentSourceEnvelope, GraphError>
 
-  func changePaymentMethod(project: Project)
-    -> SignalProducer<ChangePaymentMethodEnvelope, ErrorEnvelope>
-
   /// Deletes a payment method
   func deletePaymentMethod(input: PaymentSourceDeleteInput) ->
     SignalProducer<DeletePaymentMethodEnvelope, GraphError>
@@ -83,10 +77,6 @@ public protocol ServiceType {
   /// Removes an image from a project update draft.
   func delete(image: UpdateDraft.Image, fromDraft draft: UpdateDraft)
     -> SignalProducer<UpdateDraft.Image, ErrorEnvelope>
-
-  /// Removes a video from a project update draft.
-  func delete(video: UpdateDraft.Video, fromDraft draft: UpdateDraft)
-    -> SignalProducer<UpdateDraft.Video, ErrorEnvelope>
 
   func exportData() -> SignalProducer<VoidEnvelope, ErrorEnvelope>
 
@@ -142,15 +132,19 @@ public protocol ServiceType {
 
   /// Fetch a User's account fields
   func fetchGraphUserAccountFields(query: NonEmptySet<Query>)
-    -> SignalProducer<UserEnvelope<UserAccountFields>, GraphError>
+    -> SignalProducer<UserEnvelope<GraphUser>, GraphError>
+
+  /// Fetch User's backings with a specific status.
+  func fetchGraphUserBackings(query: NonEmptySet<Query>)
+    -> SignalProducer<BackingsEnvelope, ErrorEnvelope>
 
   /// Fetch User's email fields object using graphQL.
   func fetchGraphUserEmailFields(query: NonEmptySet<Query>)
     -> SignalProducer<UserEnvelope<UserEmailFields>, GraphError>
 
-  /// Fetch User's backings with a specific status.
-  func fetchGraphUserBackings(query: NonEmptySet<Query>)
-    -> SignalProducer<UserEnvelope<GraphBackingEnvelope>, GraphError>
+  /// Fetch Backing data for ManagePledgeViewController
+  func fetchManagePledgeViewBacking(query: NonEmptySet<Query>)
+    -> SignalProducer<ProjectAndBackingEnvelope, ErrorEnvelope>
 
   /// Fetches all of the messages in a particular message thread.
   func fetchMessageThread(messageThreadId: Int)
@@ -184,10 +178,6 @@ public protocol ServiceType {
   func fetchProjectActivities(paginationUrl: String) ->
     SignalProducer<ProjectActivityEnvelope, ErrorEnvelope>
 
-  /// Fetch the project creator details for a project with a given query.
-  func fetchProjectCreatorDetails(query: NonEmptySet<Query>)
-    -> SignalProducer<ProjectCreatorDetailsEnvelope, GraphError>
-
   /// Fetch the user's project notifications.
   func fetchProjectNotifications() -> SignalProducer<[ProjectNotification], ErrorEnvelope>
 
@@ -199,6 +189,10 @@ public protocol ServiceType {
 
   /// Fetches the stats for a particular project.
   func fetchProjectStats(projectId: Int) -> SignalProducer<ProjectStatsEnvelope, ErrorEnvelope>
+
+  /// Fetch the add-on rewards for the add-on selection view with a given query.
+  func fetchRewardAddOnsSelectionViewRewards(query: NonEmptySet<Query>)
+    -> SignalProducer<Project, ErrorEnvelope>
 
   /// Fetches a reward for a project and reward id.
   func fetchRewardShippingRules(projectId: Int, rewardId: Int)
@@ -216,9 +210,6 @@ public protocol ServiceType {
 
   /// Fetches a project update draft.
   func fetchUpdateDraft(forProject project: Project) -> SignalProducer<UpdateDraft, ErrorEnvelope>
-
-  /// Fetches the current user's backed projects.
-  func fetchUserProjectsBacked() -> SignalProducer<ProjectsEnvelope, ErrorEnvelope>
 
   /// Fetches more user backed projects.
   func fetchUserProjectsBacked(paginationUrl url: String) -> SignalProducer<ProjectsEnvelope, ErrorEnvelope>
@@ -289,6 +280,10 @@ public protocol ServiceType {
   func sendVerificationEmail(input: EmptyInput)
     -> SignalProducer<GraphMutationEmptyResponseEnvelope, GraphError>
 
+  /// Signin with Apple
+  func signInWithApple(input: SignInWithAppleInput)
+    -> SignalProducer<SignInWithAppleEnvelope, GraphError>
+
   /// Signup with email.
   func signup(
     name: String, email: String, password: String, passwordConfirmation: String,
@@ -305,15 +300,6 @@ public protocol ServiceType {
   /// Updates a backing
   func updateBacking(input: UpdateBackingInput) -> SignalProducer<UpdateBackingEnvelope, GraphError>
 
-  /// Performs the first step of checkout by creating a pledge on the server.
-  func updatePledge(
-    project: Project,
-    amount: Double,
-    reward: Reward?,
-    shippingLocation: Location?,
-    tappedReward: Bool
-  ) -> SignalProducer<UpdatePledgeEnvelope, ErrorEnvelope>
-
   /// Update the project notification setting.
   func updateProjectNotification(_ notification: ProjectNotification)
     -> SignalProducer<ProjectNotification, ErrorEnvelope>
@@ -327,6 +313,10 @@ public protocol ServiceType {
 
   func unwatchProject(input: WatchProjectInput) ->
     SignalProducer<GraphMutationWatchProjectResponseEnvelope, GraphError>
+
+  /// Verifies an email address with a given access token.
+  func verifyEmail(withToken token: String)
+    -> SignalProducer<EmailVerificationResponseEnvelope, ErrorEnvelope>
 
   func watchProject(input: WatchProjectInput) ->
     SignalProducer<GraphMutationWatchProjectResponseEnvelope, GraphError>
@@ -371,7 +361,6 @@ extension ServiceType {
     var headers = self.defaultHeaders
 
     let method = request.httpMethod?.uppercased()
-    // swiftlint:disable:next force_unwrapping
     var components = URLComponents(url: URL, resolvingAgainstBaseURL: false)!
     var queryItems = components.queryItems ?? []
     queryItems.append(contentsOf: self.defaultQueryParams.map(URLQueryItem.init(name:value:)))
@@ -430,7 +419,6 @@ extension ServiceType {
 
     request.httpBody = "query=\(queryString)".data(using: .utf8)
 
-    // swiftlint:disable:next force_unwrapping
     let components = URLComponents(url: URL, resolvingAgainstBaseURL: false)!
     request.url = components.url
     request.allHTTPHeaderFields = self.defaultHeaders
@@ -473,7 +461,6 @@ extension ServiceType {
     var headers = self.defaultHeaders
     headers["Content-Type"] = "application/json; charset=utf-8"
 
-    // swiftlint:disable:next force_unwrapping
     let components = URLComponents(url: URL, resolvingAgainstBaseURL: false)!
     request.url = components.url
     request.allHTTPHeaderFields = headers
@@ -496,7 +483,12 @@ extension ServiceType {
     headers["X-KICKSTARTER-CLIENT"] = self.serverConfig.apiClientAuth.clientId
     headers["Kickstarter-iOS-App-UUID"] = self.deviceIdentifier
 
-    return headers
+    return headers.withAllValuesFrom(self.pxHeaders)
+  }
+
+  // PerimeterX authorization header
+  fileprivate var pxHeaders: [String: String] {
+    return (PXManager.sharedInstance()?.httpHeaders() as! [String: String])
   }
 
   func graphMutationRequestBody(mutation: String, input: [String: Any]) -> [String: Any] {

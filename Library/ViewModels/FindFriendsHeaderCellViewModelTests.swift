@@ -35,8 +35,5 @@ final class FindFriendsHeaderCellViewModelTests: TestCase {
     self.vm.inputs.closeButtonTapped()
 
     self.notifyPresenterToDismissHeader.assertValueCount(1)
-    XCTAssertEqual(["Close Find Friends"], self.trackingClient.events)
-    // swiftlint:disable:next force_cast
-    XCTAssertEqual(["activity"], self.trackingClient.properties.map { $0["source"] as! String? })
   }
 }

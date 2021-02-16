@@ -35,15 +35,15 @@ final class UserTests: XCTestCase {
         "name": "Brooklyn"
       ],
       "is_admin": false,
+      "is_email_verified": false,
       "is_friend": false,
       "opted_out_of_recommendations": true,
       "show_public_profile": false,
       "social": true
     ]
-    let decoded = User.decodeJSONDictionary(json)
-    let user = decoded.value
 
-    XCTAssertNil(decoded.error)
+    let user: User? = tryDecode(json)
+
     XCTAssertEqual(1, user?.id)
     XCTAssertEqual(false, user?.isAdmin)
     XCTAssertEqual("http://www.kickstarter.com/small.jpg", user?.avatar.small)
@@ -54,6 +54,7 @@ final class UserTests: XCTestCase {
     XCTAssertEqual(false, user?.newsletters.games)
     XCTAssertEqual(false, user?.notifications.commentReplies)
     XCTAssertEqual(false, user?.facebookConnected)
+    XCTAssertEqual(false, user?.isEmailVerified)
     XCTAssertEqual(false, user?.isFriend)
     XCTAssertNotNil(user?.location)
     XCTAssertEqual(json as NSDictionary?, user?.encode() as NSDictionary?)
@@ -83,14 +84,15 @@ final class UserTests: XCTestCase {
         "name": "Brooklyn"
       ],
       "is_admin": false,
+      "is_email_verified": false,
       "is_friend": false,
       "opted_out_of_recommendations": true,
       "show_public_profile": false,
       "social": true
     ]
-    let user = User.decodeJSONDictionary(json)
+    let user: User? = User.decodeJSONDictionary(json)
 
-    XCTAssertEqual(user.value?.encode() as NSDictionary?, json as NSDictionary?)
+    XCTAssertEqual(user?.encode() as NSDictionary?, json as NSDictionary?)
   }
 
   func testIsRepeatCreator() {

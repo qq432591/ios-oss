@@ -32,6 +32,7 @@ internal final class ThanksViewController: UIViewController, UITableViewDelegate
 
     self.projectsTableView.register(nib: .DiscoveryPostcardCell)
     self.projectsTableView.register(nib: .ThanksCategoryCell)
+    self.projectsTableView.registerCellClass(DiscoveryProjectCardCell.self)
 
     self.projectsTableView.dataSource = self.dataSource
     self.projectsTableView.delegate = self
@@ -73,25 +74,25 @@ internal final class ThanksViewController: UIViewController, UITableViewDelegate
       |> UITableView.lens.estimatedRowHeight .~ 550
 
     _ = self.thankYouLabel
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
       |> UILabel.lens.font .~ UIFont.ksr_title1(size: 36)
       |> UILabel.lens.text %~ { _ in Strings.Thank_you_exclamation() }
       |> UILabel.lens.isAccessibilityElement .~ false
 
     _ = self.backedLabel
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
 
     _ = self.separatorView
-      |> UIView.lens.backgroundColor .~ .ksr_soft_black
+      |> UIView.lens.backgroundColor .~ .ksr_support_700
 
     _ = self.recommendationsLabel
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
       |> UILabel.lens.font .~ .ksr_subhead()
       |> UILabel.lens.text %~ { _ in Strings.Other_projects_you_might_like() }
 
     _ = self.shareMoreButton
       |> greyButtonStyle
-      |> UIButton.lens.targets .~ [(self, #selector(shareMoreButtonTapped), .touchUpInside)]
+      |> UIButton.lens.targets .~ [(self, #selector(self.shareMoreButtonTapped), .touchUpInside)]
       |> UIButton.lens.title(for: .normal) %~ { _ in
         Strings.project_accessibility_button_share_label()
       }
@@ -169,8 +170,12 @@ internal final class ThanksViewController: UIViewController, UITableViewDelegate
 
     self.viewModel.outputs.showRecommendations
       .observeForUI()
-      .observeValues { [weak self] projects, category in
-        self?.dataSource.loadData(projects: projects, category: category)
+      .observeValues { [weak self] projects, category, nativeProjectCardsVariant in
+        self?.dataSource.loadData(
+          projects: projects,
+          category: category,
+          nativeProjectCardsVariant: nativeProjectCardsVariant
+        )
         self?.projectsTableView.reloadData()
       }
 
@@ -208,6 +213,9 @@ internal final class ThanksViewController: UIViewController, UITableViewDelegate
       initialPlaylist: projects,
       navigatorDelegate: self
     )
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      vc.modalPresentationStyle = .fullScreen
+    }
     self.present(vc, animated: true, completion: nil)
   }
 
@@ -236,18 +244,6 @@ internal final class ThanksViewController: UIViewController, UITableViewDelegate
   }
 
   fileprivate func showShareSheet(_ controller: UIActivityViewController) {
-    controller.completionWithItemsHandler = { [weak self] activityType, completed, returnedItems, error in
-
-      self?.shareViewModel.inputs.shareActivityCompletion(
-        with: .init(
-          activityType: activityType,
-          completed: completed,
-          returnedItems: returnedItems,
-          activityError: error
-        )
-      )
-    }
-
     if UIDevice.current.userInterfaceIdiom == .pad {
       controller.modalPresentationStyle = .popover
       let popover = controller.popoverPresentationController

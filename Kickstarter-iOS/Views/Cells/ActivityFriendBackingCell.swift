@@ -32,7 +32,7 @@ internal final class ActivityFriendBackingCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.friendImageURL
       .observeForUI()
       .on(event: { [weak friendImageView] _ in
-        friendImageView?.af_cancelImageRequest()
+        friendImageView?.af.cancelImageRequest()
         friendImageView?.image = nil
       })
       .skipNil()
@@ -51,7 +51,7 @@ internal final class ActivityFriendBackingCell: UITableViewCell, ValueCell {
     self.viewModel.outputs.projectImageURL
       .observeForUI()
       .on(event: { [weak projectImageView] _ in
-        projectImageView?.af_cancelImageRequest()
+        projectImageView?.af.cancelImageRequest()
         projectImageView?.image = nil
       })
       .skipNil()
@@ -77,14 +77,14 @@ internal final class ActivityFriendBackingCell: UITableViewCell, ValueCell {
       |> ignoresInvertColorsImageViewStyle
 
     _ = self.fundingProgressContainerView
-      |> UIView.lens.backgroundColor .~ .ksr_navy_400
+      |> UIView.lens.backgroundColor .~ .ksr_support_300
 
     _ = self.projectImageView
       |> UIImageView.lens.clipsToBounds .~ true
 
     _ = self.projectNameLabel
       |> UILabel.lens.font .~ .ksr_title1(size: 18)
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
 
     _ = self.projectImageView
       |> ignoresInvertColorsImageViewStyle

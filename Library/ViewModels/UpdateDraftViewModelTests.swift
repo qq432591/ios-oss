@@ -281,10 +281,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.showImagePicker.assertValues([.cameraRoll])
 
       self.vm.inputs.imagePickerCanceled()
-      XCTAssertEqual(
-        ["Viewed Draft", "Started Add Attachment", "Canceled Add Attachment"],
-        self.trackingClient.events, "Koala attachment events tracked"
-      )
 
       self.vm.inputs.addAttachmentButtonTapped(availableSources: [.camera, .cameraRoll])
       self.showAttachmentActions.assertValues([[.cameraRoll], [.camera, .cameraRoll]])
@@ -292,20 +288,11 @@ final class UpdateDraftViewModelTests: TestCase {
       self.vm.inputs.addAttachmentSheetButtonTapped(.camera)
       self.showImagePicker.assertValues([.cameraRoll, .camera])
 
-      // swiftlint:disable:next force_unwrapping
       self.vm.inputs.imagePicked(url: URL(string: "/tmp/photo.jpg")!, fromSource: .camera)
 
       self.attachmentAdded.assertValues([])
       self.scheduler.advance()
       self.attachmentAdded.assertValues([.image(image)])
-
-      XCTAssertEqual(
-        [
-          "Viewed Draft", "Started Add Attachment", "Canceled Add Attachment",
-          "Started Add Attachment", "Completed Add Attachment"
-        ],
-        self.trackingClient.events, "Koala attachment events tracked"
-      )
     }
   }
 
@@ -324,20 +311,12 @@ final class UpdateDraftViewModelTests: TestCase {
       self.vm.inputs.addAttachmentSheetButtonTapped(.cameraRoll)
       self.showImagePicker.assertValues([.cameraRoll])
 
-      // swiftlint:disable:next force_unwrapping
       self.vm.inputs.imagePicked(url: URL(string: "/tmp/photo.jpg")!, fromSource: .cameraRoll)
 
       self.showAddAttachmentFailure.assertValueCount(0)
       self.scheduler.advance()
       self.attachmentAdded.assertValues([])
       self.showAddAttachmentFailure.assertValueCount(1)
-
-      XCTAssertEqual(
-        [
-          "Viewed Draft", "Started Add Attachment", "Failed Add Attachment"
-        ],
-        self.trackingClient.events, "Koala attachment events tracked"
-      )
     }
   }
 
@@ -354,8 +333,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.vm.inputs.attachmentTapped(id: id)
       self.showRemoveAttachmentConfirmation.assertValues([.image(image)])
 
-      self.vm.inputs.removeAttachmentConfirmationCanceled()
-
       self.vm.inputs.attachmentTapped(id: id)
       self.showRemoveAttachmentConfirmation.assertValues([.image(image), .image(image)])
 
@@ -364,14 +341,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.attachmentRemoved.assertValues([])
       self.scheduler.advance()
       self.attachmentRemoved.assertValues([.image(image)])
-
-      XCTAssertEqual(
-        [
-          "Viewed Draft", "Started Remove Attachment", "Canceled Remove Attachment",
-          "Started Remove Attachment", "Completed Remove Attachment"
-        ],
-        self.trackingClient.events, "Koala attachment events tracked"
-      )
     }
   }
 
@@ -396,13 +365,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.scheduler.advance()
       self.attachmentRemoved.assertValues([])
       self.showRemoveAttachmentFailure.assertValueCount(1)
-
-      XCTAssertEqual(
-        [
-          "Viewed Draft", "Started Remove Attachment", "Failed Remove Attachment"
-        ],
-        self.trackingClient.events, "Koala attachment events tracked"
-      )
     }
   }
 
@@ -425,7 +387,6 @@ final class UpdateDraftViewModelTests: TestCase {
 
       self.vm.inputs.addAttachmentButtonTapped(availableSources: [.camera, .cameraRoll])
       self.vm.inputs.addAttachmentSheetButtonTapped(.camera)
-      // swiftlint:disable:next force_unwrapping
       self.vm.inputs.imagePicked(url: URL(string: "/tmp/photo.jpg")!, fromSource: .camera)
 
       self.scheduler.advance()
@@ -462,7 +423,6 @@ final class UpdateDraftViewModelTests: TestCase {
 
       self.vm.inputs.addAttachmentButtonTapped(availableSources: [.camera, .cameraRoll])
       self.vm.inputs.addAttachmentSheetButtonTapped(.camera)
-      // swiftlint:disable:next force_unwrapping
       self.vm.inputs.imagePicked(url: URL(string: "/tmp/photo.jpg")!, fromSource: .camera)
 
       self.scheduler.advance()
@@ -506,11 +466,6 @@ final class UpdateDraftViewModelTests: TestCase {
 
       self.resignFirstResponder.assertValueCount(1)
       self.notifyPresenterViewControllerWantsDismissal.assertValueCount(1)
-
-      XCTAssertEqual(
-        ["Viewed Draft", "Closed Draft"], self.trackingClient.events,
-        "Koala closed draft is tracked"
-      )
     }
   }
 
@@ -526,11 +481,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.scheduler.advance()
 
       self.notifyPresenterViewControllerWantsDismissal.assertValueCount(1)
-
-      XCTAssertEqual(
-        ["Viewed Draft", "Closed Draft", "Edited Title"], self.trackingClient.events,
-        "Koala edited title is tracked"
-      )
     }
   }
 
@@ -544,11 +494,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.goToPreview.assertValues([])
       self.vm.inputs.previewButtonTapped()
       self.scheduler.advance()
-
-      XCTAssertEqual(
-        ["Viewed Draft", "Previewed Update", "Update Preview"], self.trackingClient.events,
-        "Koala previewed update is tracked"
-      )
 
       self.goToPreview.assertValues([draft])
     }
@@ -569,11 +514,6 @@ final class UpdateDraftViewModelTests: TestCase {
 
       self.notifyPresenterViewControllerWantsDismissal.assertValueCount(0)
 
-      XCTAssertEqual(
-        ["Viewed Draft", "Previewed Update", "Update Preview", "Edited Title"],
-        self.trackingClient.events, "Koala previewed update is tracked"
-      )
-
       self.goToPreview.assertValues([draft])
     }
   }
@@ -590,11 +530,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.scheduler.advance()
 
       self.notifyPresenterViewControllerWantsDismissal.assertValueCount(1)
-
-      XCTAssertEqual(
-        ["Viewed Draft", "Closed Draft", "Edited Body"], self.trackingClient.events,
-        "Koala body editing is tracked"
-      )
     }
   }
 
@@ -611,11 +546,6 @@ final class UpdateDraftViewModelTests: TestCase {
       self.scheduler.advance()
 
       self.notifyPresenterViewControllerWantsDismissal.assertValueCount(1)
-
-      XCTAssertEqual(
-        ["Viewed Draft", "Closed Draft", "Changed Visibility"], self.trackingClient.events,
-        "Koala changed visibility is tracked"
-      )
     }
   }
 
@@ -630,8 +560,6 @@ final class UpdateDraftViewModelTests: TestCase {
 
       self.showLoadFailure.assertValueCount(1)
       self.notifyPresenterViewControllerWantsDismissal.assertValueCount(1)
-
-      XCTAssertEqual(["Viewed Draft", "Closed Draft"], self.trackingClient.events)
     }
   }
 
@@ -649,8 +577,6 @@ final class UpdateDraftViewModelTests: TestCase {
 
       self.notifyPresenterViewControllerWantsDismissal.assertValueCount(0)
       self.showSaveFailure.assertValueCount(1)
-
-      XCTAssertEqual(["Viewed Draft"], self.trackingClient.events, "Koala body editing is not tracked")
     }
   }
 }

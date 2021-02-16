@@ -87,15 +87,15 @@ internal final class FindFriendsFacebookConnectCell: UITableViewCell, ValueCell 
 
     _ = self.titleLabel
       |> UILabel.lens.font .~ .ksr_headline(size: 14)
-      |> UILabel.lens.textColor .~ .ksr_soft_black
+      |> UILabel.lens.textColor .~ .ksr_support_700
 
     _ = self.subtitleLabel
       |> UILabel.lens.font .~ .ksr_subhead(size: 12)
-      |> UILabel.lens.textColor .~ .ksr_text_dark_grey_400
+      |> UILabel.lens.textColor .~ .ksr_support_400
 
     _ = self.closeButton
-      |> UIButton.lens.tintColor .~ .ksr_soft_black
-      |> UIButton.lens.targets .~ [(self, action: #selector(closeButtonTapped), .touchUpInside)]
+      |> UIButton.lens.tintColor .~ .ksr_support_700
+      |> UIButton.lens.targets .~ [(self, action: #selector(self.closeButtonTapped), .touchUpInside)]
       |> UIButton.lens.contentEdgeInsets .~ .init(
         top: Styles.grid(1), left: Styles.grid(3),
         bottom: Styles.grid(3), right: Styles.grid(2)
@@ -103,7 +103,9 @@ internal final class FindFriendsFacebookConnectCell: UITableViewCell, ValueCell 
 
     _ = self.facebookConnectButton
       |> facebookButtonStyle
-      |> UIButton.lens.targets .~ [(self, action: #selector(facebookConnectButtonTapped), .touchUpInside)]
+      |> UIButton.lens.targets .~ [
+        (self, action: #selector(self.facebookConnectButtonTapped), .touchUpInside)
+      ]
   }
 
   // MARK: - Facebook Login

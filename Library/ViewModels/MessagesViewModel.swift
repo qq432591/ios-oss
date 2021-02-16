@@ -33,7 +33,7 @@ public protocol MessagesViewModelOutputs {
   var emptyStateIsVisibleAndMessageToUser: Signal<(Bool, String), Never> { get }
 
   /// Emits when we should go to the backing screen.
-  var goToBacking: Signal<(Project, User), Never> { get }
+  var goToBacking: Signal<ManagePledgeViewParamConfigData, Never> { get }
 
   /// Emits when we should go to the projet.
   var goToProject: Signal<(Project, RefTag), Never> { get }
@@ -42,7 +42,7 @@ public protocol MessagesViewModelOutputs {
   var messages: Signal<[Message], Never> { get }
 
   /// Emits when we should show the message dialog.
-  var presentMessageDialog: Signal<(MessageThread, Koala.MessageDialogContext), Never> { get }
+  var presentMessageDialog: Signal<(MessageThread, KSRAnalytics.MessageDialogContext), Never> { get }
 
   /// Emits the project we are viewing the messages for.
   var project: Signal<Project, Never> { get }
@@ -163,10 +163,14 @@ public final class MessagesViewModel: MessagesViewModelType, MessagesViewModelIn
 
     self.goToBacking = Signal.combineLatest(messageThreadEnvelope, currentUser)
       .takeWhen(self.backingInfoPressedProperty.signal)
-      .map { env, currentUser in
-        env.messageThread.project.personalization.isBacking == .some(true)
-          ? (env.messageThread.project, currentUser)
-          : (env.messageThread.project, env.messageThread.participant)
+      .compactMap { env, _ -> ManagePledgeViewParamConfigData? in
+        guard let backing = env.messageThread.backing else {
+          return nil
+        }
+
+        let project = env.messageThread.project
+
+        return (projectParam: Param.slug(project.slug), backingParam: Param.id(backing.id))
       }
 
     self.goToProject = self.project.takeWhen(self.projectBannerTappedProperty.signal)
@@ -178,12 +182,6 @@ public final class MessagesViewModel: MessagesViewModelType, MessagesViewModelIn
           .demoteErrors()
       }
       .ignoreValues()
-
-    Signal.combineLatest(self.project, self.viewDidLoadProperty.signal)
-      .take(first: 1)
-      .observeValues { project, _ in
-        AppEnvironment.current.koala.trackMessageThreadView(project: project)
-      }
   }
 
   private let backingInfoPressedProperty = MutableProperty(())
@@ -218,10 +216,10 @@ public final class MessagesViewModel: MessagesViewModelType, MessagesViewModelIn
 
   public let backingAndProjectAndIsFromBacking: Signal<(Backing, Project, Bool), Never>
   public let emptyStateIsVisibleAndMessageToUser: Signal<(Bool, String), Never>
-  public let goToBacking: Signal<(Project, User), Never>
+  public let goToBacking: Signal<ManagePledgeViewParamConfigData, Never>
   public let goToProject: Signal<(Project, RefTag), Never>
   public let messages: Signal<[Message], Never>
-  public let presentMessageDialog: Signal<(MessageThread, Koala.MessageDialogContext), Never>
+  public let presentMessageDialog: Signal<(MessageThread, KSRAnalytics.MessageDialogContext), Never>
   public let project: Signal<Project, Never>
   public let replyButtonIsEnabled: Signal<Bool, Never>
   public let successfullyMarkedAsRead: Signal<(), Never>

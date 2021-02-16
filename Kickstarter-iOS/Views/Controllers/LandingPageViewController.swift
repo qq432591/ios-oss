@@ -206,10 +206,11 @@ public final class LandingPageViewController: UIViewController {
   }
 }
 
-// Styles
+// MARK: - Styles
+
 private let backgroundImageViewStyle: ImageViewStyle = { imageView in
   imageView
-    |> \.contentMode .~ .scaleToFill
+    |> \.contentMode .~ .scaleAspectFill
     |> \.image .~ image(named: "landing-page-background")
 }
 
@@ -234,7 +235,7 @@ private let ctaButtonStyle: ButtonStyle = { button in
 private let descriptionLabelStyle: LabelStyle = { label in
   label
     |> \.numberOfLines .~ 0
-    |> \.textColor .~ UIColor.ksr_text_dark_grey_500
+    |> \.textColor .~ UIColor.ksr_support_400
     |> \.font .~ UIFont.ksr_callout()
     |> \.textAlignment .~ .center
     |> \.text %~ { _ in
@@ -251,16 +252,17 @@ private let labelsStackViewStyle: StackViewStyle = { stackView in
 private let logoImageViewStyle: ImageViewStyle = { imageView in
   imageView
     |> \.image .~ image(named: "kickstarter-logo")?.withRenderingMode(.alwaysTemplate)
-    |> \.tintColor .~ .ksr_green_500
+    |> \.tintColor .~ .ksr_create_500
     |> \.contentMode .~ .scaleAspectFit
     |> \.translatesAutoresizingMaskIntoConstraints .~ false
+    |> \.accessibilityLabel %~ { _ in Strings.general_accessibility_kickstarter() }
 }
 
 private let pageControlStyle: PageControlStyle = { pageControl in
   pageControl
     |> \.currentPage .~ 0
-    |> \.currentPageIndicatorTintColor .~ .ksr_green_500
-    |> \.pageIndicatorTintColor .~ .white
+    |> \.currentPageIndicatorTintColor .~ .ksr_create_700
+    |> \.pageIndicatorTintColor .~ .ksr_white
 }
 
 private let rootStackViewStyle: StackViewStyle = { stackView in
@@ -290,7 +292,7 @@ private let titleLabelStyle: LabelStyle = { label in
 
 private let viewStyle: ViewStyle = { view in
   view
-    |> \.layoutMargins .~ UIEdgeInsets.init(bottom: Styles.grid(3))
+    |> \.layoutMargins .~ UIEdgeInsets.init(all: Styles.grid(3))
 }
 
 extension LandingPageViewController: UIScrollViewDelegate {

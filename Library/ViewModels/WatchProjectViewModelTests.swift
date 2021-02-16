@@ -11,7 +11,7 @@ internal final class WatchProjectViewModelTests: TestCase {
   internal let generateSelectionFeedback = TestObserver<(), Never>()
   internal let generateNotificationSuccessFeedback = TestObserver<(), Never>()
   internal let goToLoginTout = TestObserver<(), Never>()
-  internal let postNotificationWithProject = TestObserver<Project, Never>() // fixme: test
+  internal let postNotificationWithProject = TestObserver<Project, Never>()
   internal let saveButtonAccessibilityValue = TestObserver<String, Never>()
   internal let saveButtonSelected = TestObserver<Bool, Never>()
   internal let showNotificationDialog = TestObserver<Notification.Name, Never>()
@@ -288,9 +288,15 @@ internal final class WatchProjectViewModelTests: TestCase {
 
       XCTAssertEqual(
         ["Watch Project Button Clicked"],
-        trackingClient.events
+        self.dataLakeTrackingClient.events
       )
-      XCTAssertEqual(["project_screen"], self.trackingClient.properties(forKey: "context_location"))
+      XCTAssertEqual(["project"], self.dataLakeTrackingClient.properties(forKey: "context_page"))
+
+      XCTAssertEqual(
+        ["Watch Project Button Clicked"],
+        self.segmentTrackingClient.events
+      )
+      XCTAssertEqual(["project"], self.segmentTrackingClient.properties(forKey: "context_page"))
 
       self.saveButtonSelected.assertValues([false, true], "Save button selects immediately.")
       self.saveButtonAccessibilityValue.assertValues(["Unsaved", "Saved"])
@@ -309,11 +315,20 @@ internal final class WatchProjectViewModelTests: TestCase {
 
         XCTAssertEqual(
           ["Watch Project Button Clicked", "Watch Project Button Clicked"],
-          trackingClient.events
+          self.dataLakeTrackingClient.events
         )
         XCTAssertEqual(
-          ["project_screen", "project_screen"],
-          self.trackingClient.properties(forKey: "context_location")
+          ["project", "project"],
+          self.dataLakeTrackingClient.properties(forKey: "context_page")
+        )
+
+        XCTAssertEqual(
+          ["Watch Project Button Clicked", "Watch Project Button Clicked"],
+          self.segmentTrackingClient.events
+        )
+        XCTAssertEqual(
+          ["project", "project"],
+          self.segmentTrackingClient.properties(forKey: "context_page")
         )
 
         self.saveButtonSelected.assertValues(
@@ -350,9 +365,15 @@ internal final class WatchProjectViewModelTests: TestCase {
 
       XCTAssertEqual(
         ["Watch Project Button Clicked"],
-        trackingClient.events
+        self.dataLakeTrackingClient.events
       )
-      XCTAssertEqual(["project_screen"], self.trackingClient.properties(forKey: "context_location"))
+      XCTAssertEqual(["project"], self.dataLakeTrackingClient.properties(forKey: "context_page"))
+
+      XCTAssertEqual(
+        ["Watch Project Button Clicked"],
+        self.segmentTrackingClient.events
+      )
+      XCTAssertEqual(["project"], self.segmentTrackingClient.properties(forKey: "context_page"))
 
       self.scheduler.advance(by: .milliseconds(500))
 
@@ -390,9 +411,15 @@ internal final class WatchProjectViewModelTests: TestCase {
 
       XCTAssertEqual(
         ["Watch Project Button Clicked"],
-        trackingClient.events
+        self.dataLakeTrackingClient.events
       )
-      XCTAssertEqual(["explore_screen"], self.trackingClient.properties(forKey: "context_location"))
+      XCTAssertEqual(["discover"], self.dataLakeTrackingClient.properties(forKey: "context_page"))
+
+      XCTAssertEqual(
+        ["Watch Project Button Clicked"],
+        self.segmentTrackingClient.events
+      )
+      XCTAssertEqual(["discover"], self.segmentTrackingClient.properties(forKey: "context_page"))
     }
   }
 }

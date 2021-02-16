@@ -7,7 +7,6 @@ import ReactiveSwift
 import WebKit
 import XCTest
 
-// swiftlint:disable force_unwrapping
 final class UpdateViewModelTests: TestCase {
   fileprivate let vm: UpdateViewModelType = UpdateViewModel()
 
@@ -189,8 +188,8 @@ final class UpdateViewModelTests: TestCase {
     self.webViewLoadRequest.assertValueCount(1)
     self.goToSafariBrowser.assertValues([outsideUrl])
 
-    XCTAssertEqual(["Opened External Link"], self.trackingClient.events)
-    XCTAssertEqual("project_update", self.trackingClient.properties.last?["context"] as? String)
+    XCTAssertEqual([], self.dataLakeTrackingClient.events)
+    XCTAssertEqual([], self.segmentTrackingClient.events)
   }
 
   func testGoToSafariBrowser_PrelaunchProject() {
@@ -231,8 +230,10 @@ final class UpdateViewModelTests: TestCase {
       self.webViewLoadRequest.assertValueCount(1, "Initial update load request")
       self.goToSafariBrowser.assertValues([])
 
-      XCTAssertEqual([], self.trackingClient.events)
-      XCTAssertEqual(nil, self.trackingClient.properties.last?["context"] as? String)
+      XCTAssertEqual([], self.dataLakeTrackingClient.events)
+      XCTAssertEqual(nil, self.dataLakeTrackingClient.properties.last?["context"] as? String)
+      XCTAssertEqual([], self.segmentTrackingClient.events)
+      XCTAssertEqual(nil, self.segmentTrackingClient.properties.last?["context"] as? String)
 
       let request2 = URLRequest(url: prelaunchProjectURL)
 
@@ -255,8 +256,10 @@ final class UpdateViewModelTests: TestCase {
       self.webViewLoadRequest.assertValueCount(1, "Initial update load request")
       self.goToSafariBrowser.assertValues([prelaunchProjectURL])
 
-      XCTAssertEqual(["Opened External Link"], self.trackingClient.events)
-      XCTAssertEqual("project_update", self.trackingClient.properties.last?["context"] as? String)
+      XCTAssertEqual([], self.dataLakeTrackingClient.events)
+      XCTAssertEqual(nil, self.dataLakeTrackingClient.properties.last?["context"] as? String)
+      XCTAssertEqual([], self.segmentTrackingClient.events)
+      XCTAssertEqual(nil, self.segmentTrackingClient.properties.last?["context"] as? String)
     }
   }
 }

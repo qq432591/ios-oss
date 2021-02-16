@@ -3,19 +3,17 @@ import Library
 import Prelude
 import UIKit
 
-public typealias PledgeSummaryCellData = (project: Project, total: Double)
-
 final class PledgeSummaryViewController: UIViewController {
   // MARK: - Properties
 
-  private lazy var adaptableStackView: UIStackView = { UIStackView(frame: .zero) }()
+  private lazy var titleAndTotalStackView: UIStackView = { UIStackView(frame: .zero) }()
   private lazy var amountLabel: UILabel = { UILabel(frame: .zero) }()
+  private lazy var confirmationLabel: UILabel = { UILabel(frame: .zero) }()
   private lazy var rootStackView: UIStackView = {
     UIStackView(frame: .zero)
       |> \.translatesAutoresizingMaskIntoConstraints .~ false
   }()
 
-  private lazy var termsTextView: UITextView = { UITextView(frame: .zero) |> \.delegate .~ self }()
   private lazy var titleLabel: UILabel = { UILabel(frame: .zero) }()
   private lazy var totalConversionLabel: UILabel = { UILabel(frame: .zero) }()
   private lazy var totalStackView: UIStackView = { UIStackView(frame: .zero) }()
@@ -42,20 +40,21 @@ final class PledgeSummaryViewController: UIViewController {
     _ = self.rootStackView
       |> rootStackViewStyle
 
-    _ = self.adaptableStackView
-      |> checkoutAdaptableStackViewStyle(
+    _ = self.confirmationLabel
+      |> \.numberOfLines .~ 0
+      |> checkoutBackgroundStyle
+
+    _ = self.titleAndTotalStackView
+      |> adaptableStackViewStyle(
         self.traitCollection.preferredContentSizeCategory.isAccessibilityCategory
       )
-      |> adaptableStackViewStyle
+      |> titleAndTotalStackViewStyle
 
     _ = self.totalStackView
       |> totalStackViewStyle(self.traitCollection.preferredContentSizeCategory.isAccessibilityCategory)
 
     _ = self.titleLabel
       |> titleLabelStyle
-
-    _ = self.termsTextView
-      |> termsTextViewStyle
 
     _ = self.amountLabel
       |> amountLabelStyle
@@ -69,10 +68,10 @@ final class PledgeSummaryViewController: UIViewController {
       |> ksr_addSubviewToParent()
       |> ksr_constrainViewToEdgesInParent()
 
-    _ = ([self.titleLabel, self.adaptableStackView], self.rootStackView)
+    _ = ([self.titleAndTotalStackView, self.confirmationLabel], self.rootStackView)
       |> ksr_addArrangedSubviewsToStackView()
 
-    _ = ([self.termsTextView, self.totalStackView], self.adaptableStackView)
+    _ = ([self.titleLabel, self.totalStackView], self.titleAndTotalStackView)
       |> ksr_addArrangedSubviewsToStackView()
 
     _ = ([self.amountLabel, self.totalConversionLabel], self.totalStackView)
@@ -83,6 +82,10 @@ final class PledgeSummaryViewController: UIViewController {
 
   internal override func bindViewModel() {
     super.bindViewModel()
+
+    self.confirmationLabel.rac.hidden = self.viewModel.outputs.confirmationLabelHidden
+
+    self.confirmationLabel.rac.attributedText = self.viewModel.outputs.confirmationLabelAttributedText
 
     self.viewModel.outputs.notifyDelegateOpenHelpType
       .observeForControllerAction()
@@ -96,8 +99,8 @@ final class PledgeSummaryViewController: UIViewController {
 
   // MARK: - Configuration
 
-  internal func configureWith(_ project: Project, total: Double) {
-    self.viewModel.inputs.configureWith(project, total: total)
+  internal func configure(with data: PledgeSummaryViewData) {
+    self.viewModel.inputs.configure(with: data)
   }
 }
 
@@ -134,7 +137,7 @@ private let amountLabelStyle: LabelStyle = { (label: UILabel) in
   return label
 }
 
-private let adaptableStackViewStyle: StackViewStyle = { (stackView: UIStackView) in
+private let titleAndTotalStackViewStyle: StackViewStyle = { (stackView: UIStackView) in
   stackView
     |> \.alignment .~ UIStackView.Alignment.top
 }
@@ -142,19 +145,7 @@ private let adaptableStackViewStyle: StackViewStyle = { (stackView: UIStackView)
 private let rootStackViewStyle: StackViewStyle = { (stackView: UIStackView) in
   stackView
     |> verticalStackViewStyle
-    |> \.spacing .~ Styles.gridHalf(3)
-}
-
-private let termsTextViewStyle: TextViewStyle = { (textView: UITextView) -> UITextView in
-  _ = textView
-    |> tappableLinksViewStyle
-    |> \.attributedText .~ attributedTermsText()
-    |> \.accessibilityTraits .~ [.staticText]
-
-  _ = textView
-    |> checkoutBackgroundStyle
-
-  return textView
+    |> \.spacing .~ Styles.grid(3)
 }
 
 private let titleLabelStyle: LabelStyle = { (label: UILabel) -> UILabel in
@@ -171,7 +162,7 @@ private let titleLabelStyle: LabelStyle = { (label: UILabel) -> UILabel in
 private let totalConversionLabelStyle: LabelStyle = { label in
   _ = label
     |> \.font .~ .ksr_footnote()
-    |> \.textColor .~ .ksr_text_dark_grey_500
+    |> \.textColor .~ .ksr_support_400
 
   _ = label |> checkoutBackgroundStyle
 
@@ -182,26 +173,8 @@ private func totalStackViewStyle(_ isAccessibilityCategory: Bool) -> StackViewSt
   return { stackView in
     stackView
       |> verticalStackViewStyle
-      |> \.spacing .~ Styles.gridHalf(3)
+      |> \.spacing .~ Styles.grid(1)
       |> \.alignment .~
       (isAccessibilityCategory ? UIStackView.Alignment.leading : UIStackView.Alignment.trailing)
   }
-}
-
-private func attributedTermsText() -> NSAttributedString? {
-  let baseUrl = AppEnvironment.current.apiService.serverConfig.webBaseUrl
-
-  guard
-    let termsOfUseLink = HelpType.terms.url(withBaseUrl: baseUrl)?.absoluteString,
-    let privacyPolicyLink = HelpType.privacy.url(withBaseUrl: baseUrl)?.absoluteString,
-    let cookiePolicyLink = HelpType.cookie.url(withBaseUrl: baseUrl)?.absoluteString
-  else { return nil }
-
-  let string = Strings.By_pledging_you_agree_to_Kickstarters_Terms_of_Use_Privacy_Policy_and_Cookie_Policy(
-    terms_of_use_link: termsOfUseLink,
-    privacy_policy_link: privacyPolicyLink,
-    cookie_policy_link: cookiePolicyLink
-  )
-
-  return checkoutAttributedLink(with: string)
 }
